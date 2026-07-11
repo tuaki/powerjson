@@ -1,0 +1,40 @@
+{
+    "compilerOptions": {
+        /* Monorepo setup */
+        "composite": true,
+        "declaration": true,
+        "declarationMap": true,
+        "incremental": true,
+        "noEmitOnError": true,
+        "skipLibCheck": true,
+
+        /* ESM */
+        "esModuleInterop": true,
+        "isolatedModules": true,
+        "moduleResolution": "nodenext",
+        "module": "nodenext",
+        "target": "ESNext",
+        "moduleDetection": "force",
+
+        /* Linting */
+        "strict": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "forceConsistentCasingInFileNames": true,
+
+        "verbatimModuleSyntax": true,
+
+        "outDir": "./dist",
+
+        /* Features */
+        "lib": [
+            "ESNext",
+        ],
+        "resolveJsonModule": true,
+    },
+    "include": [
+        "src",
+        "eslint.config.ts",
+    ],
+}

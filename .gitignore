@@ -1,0 +1,10 @@
+.vscode
+
+# dependencies
+node_modules
+.bun
+
+# production
+dist
+
+/temp
