@@ -1,33 +1,39 @@
-import type { AnnotatedJsonObject, Annotation, ControlObject, JsonArray, JsonValue } from './json.js';
+import type { AnnotatedJsonObject, Annotation, EscapedProperty, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
 import { stringifyPath, type Path, type StringifiedPath } from './path.js';
+import type { ObjectLike } from './transformers.js';
+import type { UberJson } from './uberJson.js';
 import { ensureProperty } from './utils.js';
 
-// TODO Use enum with "none", "all", "circular".
-// "none" might be a good optímization for non-circular data.
-const DEDUPLICATE_REFERENCES = true;
-
 export class Serializer {
-    constructor() {
-        this.populateTransformers();
-    }
+    constructor(
+        readonly uberJson: UberJson,
+    ) {}
 
-    static readonly WRAPPED_KEY = 'value';
+    static readonly WRAPPED_KEY = 'w';
+    static readonly WRAPPED_DIRECTIVE = 'wrapped';
 
-    serialize(value: unknown): JsonValue {
-        const wrapper = { [Serializer.WRAPPED_KEY]: value };
-        const serialized = this.serializePlainObject(wrapper);
+    serialize(value: unknown): JsonObject {
+        // If the top-level value isn't a plain object, we have to wrap it so that it can put its annotations somewhere.
+        const isWrapped = !this.isPlainObject(value);
 
-        const annotations = serialized[Serializer.ESCAPE_KEY];
-        if (annotations === undefined) {
-            // If there are no annotations, we can just return the value directly.
-            return serialized[Serializer.WRAPPED_KEY];
+        const input = isWrapped ? { [Serializer.WRAPPED_KEY]: value } : value;
+        this.tryCreateReference(input);
+        const serialized = this.serializePlainObject(input);
+
+        if(isWrapped) {
+            const annotations = ensureProperty(serialized, Serializer.ESCAPE_KEY, {});
+            annotations[Serializer.ESCAPE_KEY] = Serializer.WRAPPED_DIRECTIVE;
         }
 
-        // There are annotations, so we have to keep it. Let's mark it as wrapped.
-        const controlObject = ensureProperty(annotations, Serializer.ESCAPE_KEY, {});
-        controlObject.isWrapped = true;
-
         return serialized;
+    }
+
+    private isPlainObject(value: unknown): value is Record<string, unknown> {
+        if (typeof value !== 'object' || value === null)
+            return false;
+
+        const prototype = Object.getPrototypeOf(value);
+        return prototype === Object.prototype || prototype === null;
     }
 
     private readonly rootToParent: Path = [];
@@ -45,24 +51,24 @@ export class Serializer {
 
     static readonly ESCAPE_KEY = '$';
 
-    private addAnnotation(annotation: Annotation): void {
+    addAnnotation(annotation: Annotation): void {
         const annotations = ensureProperty(this.parentObject, Serializer.ESCAPE_KEY, {});
 
         // TODO not ideal
         const key = stringifyPath(this.parentToValue);
 
         if (key === Serializer.ESCAPE_KEY) {
-            const control = ensureProperty(annotations, Serializer.ESCAPE_KEY, {});
-            control.annotation = annotation;
+            const escapedProperty = ensureProperty(annotations, Serializer.ESCAPE_KEY, {}) as EscapedProperty;
+            escapedProperty.annotation = annotation;
         }
         else {
             annotations[key] = annotation;
         }
     }
 
-    private getControlObject(): ControlObject {
+    private getEscapedProperty(): EscapedProperty {
         const annotations = ensureProperty(this.parentObject, Serializer.ESCAPE_KEY, {});
-        return ensureProperty(annotations, Serializer.ESCAPE_KEY, {});
+        return ensureProperty(annotations, Serializer.ESCAPE_KEY, {}) as EscapedProperty;
     }
 
     static readonly REFERENCE_ANNOTATION = 'ref';
@@ -70,12 +76,14 @@ export class Serializer {
     private tryCreateReference(value: ObjectLike): boolean {
         if (this.allReferences.has(value)) {
             // If this is a cyclic reference, we have to deduplicate it.
-            const deduplicate = DEDUPLICATE_REFERENCES || this.pathReferences.has(value);
+            const deduplicate = this.uberJson.deduplicate || this.pathReferences.has(value);
             if (deduplicate) {
                 const reference = this.allReferences.get(value)!;
                 this.addAnnotation([ Serializer.REFERENCE_ANNOTATION, reference ]);
                 return true;
             }
+
+            return false;
         }
 
         this.allReferences.set(value, stringifyPath([ ...this.rootToParent, ...this.parentToValue ]));
@@ -110,22 +118,17 @@ export class Serializer {
 
     private serializeChild(value: unknown, key: string): JsonValue | undefined {
         this.parentToValue.push(key);
-
         const output = this.serializeUnknown(value);
-
         this.parentToValue.pop();
 
         return output;
     }
 
-    // #region Containers
-
-    private serializePlainObject(value: Record<string, unknown>): AnnotatedJsonObject<typeof Serializer.ESCAPE_KEY> {
+    serializePlainObject(value: Record<string, unknown>): AnnotatedJsonObject<typeof Serializer.ESCAPE_KEY> {
         const context = this.nextContext();
         const output = context.currentObject;
 
         for (const [ key, item ] of Object.entries(value)) {
-            // TODO if key === Serializer.ANNOTATIONS_KEY
             if (BLACKLISTED_OBJECT_KEYS.has(key)) {
                 // TODO is this necessary?
                 throw new Error(`Detected property ${key}. This is a prototype pollution risk, please remove it from your object.`);
@@ -137,10 +140,9 @@ export class Serializer {
                 continue;
             }
 
-            // TODO Test this.
             if (key === Serializer.ESCAPE_KEY) {
-                const control = this.getControlObject();
-                control.value = serializedItem;
+                const escapedProperty = this.getEscapedProperty();
+                escapedProperty.value = serializedItem;
             }
             else {
                 output[key] = serializedItem;
@@ -152,7 +154,7 @@ export class Serializer {
         return output;
     }
 
-    private serializeArray(value: unknown[]): JsonArray {
+    serializeArray(value: unknown[]): JsonArray {
         const output: JsonArray = Array(value.length);
         for (let i = 0; i < value.length; i++)
             // Arrays have to preserve indexes. So, we decided to keep `undefined` as `null`. Also, `JSON.stringify([ undefined ])` returns `[ null ]`.
@@ -161,11 +163,7 @@ export class Serializer {
         return output;
     }
 
-    static readonly SET_ANNOTATION = 'Set';
-
-    private serializeSet(value: Set<unknown>): JsonArray {
-        this.addAnnotation(Serializer.SET_ANNOTATION);
-
+    serializeSet(value: Set<unknown>): JsonArray {
         const output: JsonArray = Array(value.size);
         let i = 0;
         for (const item of value) {
@@ -180,12 +178,8 @@ export class Serializer {
         return output;
     }
 
-    static readonly MAP_ANNOTATION = 'Map';
-
-    private serializeMap(value: Map<unknown, unknown>): JsonArray {
-        this.addAnnotation(Serializer.MAP_ANNOTATION);
-
-        const output: [JsonValue, JsonValue][] = Array(value.size);
+    serializeMap(value: Map<unknown, unknown>): JsonMap {
+        const output: JsonMap = Array(value.size);
         let i = 0;
         for (const [ key, item ] of value) {
             this.parentToValue.push(String(i));
@@ -221,7 +215,7 @@ export class Serializer {
             case 'number':
                 return this.serializeNumber(value);
             case 'bigint':
-                // TODO There is a new approach in ES2026 which already works mostly everywhere, but we should probably just convert it to a string for now.
+                // NICE_TO_HAVE There is a new approach in ES2026 which already works mostly everywhere, but we should probably just convert it to a string for now.
                 // Ideally, let's make it optional (this would require explicit versioning).
                 this.addAnnotation(Serializer.BIGINT_ANNOTATION);
                 return String(value);
@@ -255,7 +249,7 @@ export class Serializer {
                 return Serializer.MINUS_INFINITY;
             case 0:
                 if (1 / value === -Infinity) {
-                    // TODO This can be solved with rawJSON.
+                    // NICE_TO_HAVE This can be solved with rawJSON.
                     this.addAnnotation(Serializer.NUMBER_ANNOTATION);
                     return Serializer.NEGATIVE_ZERO;
                 }
@@ -272,137 +266,23 @@ export class Serializer {
     }
 
     private serializeObjectLike(value: ObjectLike): JsonValue | undefined {
-        const transformer = this.findTransformer(value);
+        const transformer = this.uberJson.getTransformerForObject(value);
 
         if (transformer.isReferenceType) {
             if (this.tryCreateReference(value))
                 return null;
         }
 
-        const output = transformer.serialize(value);
+        if (transformer.annotation !== undefined)
+            this.addAnnotation(transformer.annotation);
+
+        const output = transformer.serialize(value, this);
 
         if (transformer.isReferenceType)
             this.pathReferences.delete(value);
 
         return output;
     }
-
-    // There are several ways how to dispatch objects by type. We can use `instanceof`, `value.constructor`, or `Object.getPrototypeOf(value)`.
-    // All of them can be subverted - `constructor` can be changed, `instanceof` can be overridden with `Symbol.hasInstance`, and `Object.getPrototypeOf` can be overridden with `Object.setPrototypeOf`.
-    // Whoever does that surely deserves to be punished. So, let's just not care about it.
-    //
-    // By semantics, `instanceof` is probably the most correct way to do this. However, trying one type after another seems inefficient.
-    // By default, `instanceof` just checks the prototype chain [1], so we can do it ourselves. Then we can immediately find the transformer in a map.
-    // This is not exactly the same (because of `Symbol.hasInstance`), but as said above, we don't support it.
-    //
-    // There are other traps like the fact that different realms (e.g., iframes, web workers) have different prototypes. In that case, neither of these methods will work.
-    // Workaronds are available but only for some types (e.g., `Array.isArray`) and not the others (e.g., `Set`, `Date`). Libraries like node:util/types [2] provides them but they are not available in the browser.
-    //
-    // [1] https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/instanceof
-    // [2] https://bun.com/reference/node/util/types
-
-    readonly transfomers: Map<ObjectLike, Transformer> = new Map();
-
-    private findTransformer(value: ObjectLike): Transformer {
-        let prototype = Object.getPrototypeOf(value);
-
-        while (prototype !== null) {
-            const transformer = this.transfomers.get(prototype);
-            if (transformer)
-                return transformer;
-
-            prototype = Object.getPrototypeOf(prototype);
-        }
-
-        // The previous search might fail because of `Object.create(null)` shenanigans.
-        // Let's try to support at least the bare minimum of objects and arrays across realms. It ain't much but it's honest work.
-        const defaultPrototype = Array.isArray(value) ? Array.prototype : Object.prototype;
-        return this.transfomers.get(defaultPrototype)!;
-    }
-
-    private populateTransformers() {
-        this.transfomers.set(Array.prototype, {
-            name: 'Array',
-            isReferenceType: true,
-            serialize: value => this.serializeArray(value as unknown[]),
-            deserialize: value => 'TODO',
-        });
-
-        this.transfomers.set(Set.prototype, {
-            name: 'Set',
-            isReferenceType: true,
-            serialize: value => this.serializeSet(value as Set<unknown>),
-            deserialize: value => 'TODO',
-        });
-
-        this.transfomers.set(Map.prototype, {
-            name: 'Map',
-            isReferenceType: true,
-            serialize: value => this.serializeMap(value as Map<unknown, unknown>),
-            deserialize: value => 'TODO',
-        });
-
-        this.transfomers.set(Object.prototype, {
-            name: 'Object',
-            isReferenceType: true,
-            serialize: value => this.serializePlainObject(value as Record<string, unknown>),
-            deserialize: value => 'TODO',
-        });
-
-        // Contrary to superjson, we don't think built-in types should not be deduplicated by default. They are usually immutable and don't contain other values.
-
-        this.transfomers.set(Date.prototype, {
-            name: 'Date',
-            isReferenceType: false,
-            serialize: value => this.serializeDate(value as Date),
-            deserialize: value => 'TODO',
-        });
-
-        this.transfomers.set(RegExp.prototype, {
-            name: 'RegExp',
-            isReferenceType: false,
-            serialize: value => this.serializeRegExp(value as RegExp),
-            deserialize: value => 'TODO',
-        });
-
-        this.transfomers.set(URL.prototype, {
-            name: 'URL',
-            isReferenceType: false,
-            serialize: (value: URL) => this.serializeURL(value),
-            deserialize: value => 'TODO',
-        });
-    }
-
-    // `String(value)` is different from `value.toString()`.
-    // For primitive types, the first one should be, in general, faster. So we use it for stringifying indexes and so on.
-    // For objects, the first one can be overriden by `Symbol.toPrimitive` or `valueOf`. The second one can be overriden as well ... however, we decided on the second one because it is more explicit and less likely to be overriden.
-
-    static readonly DATE_ANNOTATION = 'Date';
-
-    private serializeDate(value: Date): string | null {
-        this.addAnnotation(Serializer.DATE_ANNOTATION);
-        // Date can be invalid; let's serialize it as null.
-        return isNaN(+value) ? null : value.toISOString();
-    }
-
-    static readonly REGEXP_ANNOTATION = 'RegExp';
-
-    private serializeRegExp(value: RegExp): string {
-        this.addAnnotation(Serializer.REGEXP_ANNOTATION);
-        // Returns a string in the form of `/pattern/flags`.
-        return value.toString();
-    }
-
-    static readonly URL_ANNOTATION = 'URL';
-
-    private serializeURL(value: URL): string {
-        this.addAnnotation(Serializer.URL_ANNOTATION);
-        return value.toString();
-    }
-
-    // TODO Temporal
-    // TODO Error
-    // TODO TypedArray
 }
 
 type ContextOutput<TEscape extends string> = {
@@ -411,34 +291,8 @@ type ContextOutput<TEscape extends string> = {
     prevPathFromParent: Path;
 };
 
-export type Primitive = undefined | null | string | number | boolean | bigint | symbol;
-
-/**
- * In TS, `object` represents any non-primitive type. This means "anything that returns `object` or `function` from `typeof` except `null`".
- * In our case, we don't support functions. So, let's use this types as "`object` without functions".
- */
-export type ObjectLike = object;
-
 const BLACKLISTED_OBJECT_KEYS = new Set([
     '__proto__',
     'constructor',
     'prototype',
 ]);
-
-export type Transformer<TType extends ObjectLike = ObjectLike> = {
-    name: string;
-    /**
-     * Reference types are subject to deduplication and circular reference detection. Value types are not.
-     */
-    isReferenceType: boolean;
-    /**
-     * Serializes the value to a JSON value.
-     * If undefined is returned, the value will be skipped from objects, sets, and maps. However, it will be kept in arrays as `null` to preserve indexes.
-     * Try `JSON.stringify({ a: undefined })` and `JSON.stringify([ undefined ])` to see the difference.
-     */
-    serialize(value: TType): JsonValue | undefined;
-    /**
-     * Deserializes the value from a JSON value and an annotation.
-     */
-    deserialize(value: JsonValue, annotation: Annotation): TType;
-};

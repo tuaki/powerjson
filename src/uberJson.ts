@@ -1,18 +1,26 @@
-import { Deserializer } from './deserializer.js';
-import type { JsonArray, JsonObject } from './json.js';
+import type { Annotation, JsonObject } from './json.js';
+import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transformer } from './transformers.js';
 import { Serializer } from './serializer.js';
+import { Deserializer } from './deserializer.js';
 
-class UberJson {
-    serialize(value: unknown): JsonObject | JsonArray | null {
-        const serializer = new Serializer();
-        // TODO
+export class UberJson {
+    readonly deduplicate: boolean;
+
+    // TODO Use enum with "none", "all", "circular".
+    // "none" might be a good optímization for non-circular data.
+    constructor({ deduplicate = false }: { deduplicate?: boolean } = {}) {
+        this.deduplicate = deduplicate;
+        this.addTransformers();
+    }
+
+    serialize(value: unknown): JsonObject {
+        const serializer = new Serializer(this);
         return serializer.serialize(value);
     }
 
-    deserialize(jsonObject: JsonObject) {
-        const deserializer = new Deserializer();
-        // TODO
-        return deserializer.deserialize(jsonObject);
+    deserialize(jsonValue: JsonObject) {
+        const deserializer = new Deserializer(this);
+        return deserializer.deserialize(jsonValue);
     }
 
     stringify(value: unknown, space?: string | number): string {
@@ -21,6 +29,64 @@ class UberJson {
 
     parse<T = unknown>(string: string): T {
         return this.deserialize(JSON.parse(string)) as T;
+    }
+
+
+    private readonly transformersByPrototype: Map<ObjectLike, Transformer> = new Map();
+    private readonly transformersByAnnotation: Map<string, Transformer> = new Map();
+
+    addTransformer(transformer: Transformer): void {
+        this.transformersByPrototype.set(transformer.type.prototype, transformer);
+        if (transformer.annotation !== undefined)
+            this.transformersByAnnotation.set(transformer.annotation, transformer);
+    }
+
+    // There are several ways how to dispatch objects by type. We can use `instanceof`, `value.constructor`, or `Object.getPrototypeOf(value)`.
+    // All of them can be subverted - `constructor` can be changed, `instanceof` can be overridden with `Symbol.hasInstance`, and `Object.getPrototypeOf` can be overridden with `Object.setPrototypeOf`.
+    // Whoever does that surely deserves to be punished. So, let's just not care about it.
+    //
+    // By semantics, `instanceof` is probably the most correct way to do this. However, trying one type after another seems inefficient.
+    // By default, `instanceof` just checks the prototype chain [1], so we can do it ourselves. Then we can immediately find the transformer in a map.
+    // This is not exactly the same (because of `Symbol.hasInstance`), but as said above, we don't support it.
+    //
+    // There are other traps like the fact that different realms (e.g., iframes, web workers) have different prototypes. In that case, neither of these methods will work.
+    // Workaronds are available but only for some types (e.g., `Array.isArray`) and not the others (e.g., `Set`, `Date`). Libraries like node:util/types [2] provides them but they are not available in the browser.
+    //
+    // [1] https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/instanceof
+    // [2] https://bun.com/reference/node/util/types
+
+    getTransformerForObject(value: ObjectLike): Transformer {
+        let prototype = Object.getPrototypeOf(value);
+
+        while (prototype !== null) {
+            const transformer = this.transformersByPrototype.get(prototype);
+            if (transformer)
+                return transformer;
+
+            prototype = Object.getPrototypeOf(prototype);
+        }
+
+        // The previous search might fail because of `Object.create(null)` shenanigans.
+        // Let's try to support at least the bare minimum of objects and arrays across realms. It ain't much but it's honest work.
+        const defaultPrototype = Array.isArray(value) ? Array.prototype : Object.prototype;
+        return this.transformersByPrototype.get(defaultPrototype)!;
+    }
+
+    getTransformerForAnnotation(annotation: Annotation): Transformer {
+        const typeName = typeof annotation === 'string' ? annotation : annotation[0];
+
+        const transformer = this.transformersByAnnotation.get(typeName);
+        if (!transformer)
+            throw new Error(`No transformer found for annotation: ${annotation}`);
+
+        return transformer;
+    }
+
+    private addTransformers() {
+        [
+            ...Object.values(baseTransformers),
+            ...typedArrayTransformers,
+        ].forEach(transformer => this.addTransformer(transformer));
     }
 }
 

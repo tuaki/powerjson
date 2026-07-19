@@ -1,13 +1,20 @@
-import type { Annotation, Annotations, JsonArray, JsonObject, JsonValue } from './json.js';
+import type { AnnotatedJsonObject, Annotation, Annotations, EscapedProperty, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
 import { stringifyPath, type Path, type StringifiedPath } from './path.js';
-import { Serializer, type ObjectLike, type Primitive } from './serializer.js';
+import { Serializer } from './serializer.js';
+import type { ObjectLike, Primitive } from './transformers.js';
+import type { UberJson } from './uberJson.js';
 
 export class Deserializer {
-    constructor() {}
+    constructor(
+        readonly uberJson: UberJson,
+    ) {}
 
-    deserialize(jsonObject: JsonObject) {
-        // TODO unwrap if needed
-        return this.deserializeObject(jsonObject);
+    deserialize(value: AnnotatedJsonObject<typeof Serializer.ESCAPE_KEY>) {
+        const isWrapped = value[Serializer.ESCAPE_KEY]?.[Serializer.ESCAPE_KEY] === Serializer.WRAPPED_DIRECTIVE;
+
+        const deserialized = this.deserializePlainObject(value);
+
+        return isWrapped ? deserialized[Serializer.WRAPPED_KEY] : deserialized;
     }
 
     private readonly rootToParent: Path = [];
@@ -20,7 +27,18 @@ export class Deserializer {
             return undefined;
 
         const key = stringifyPath(this.parentToValue);
-        return this.annotations[key];
+
+        if (key === Serializer.ESCAPE_KEY) {
+            const escapedProperty = this.annotations[Serializer.ESCAPE_KEY] as EscapedProperty;
+            return escapedProperty?.annotation;
+        }
+        else {
+            return this.annotations[key];
+        }
+    }
+
+    private getEscapedProperty(): EscapedProperty | undefined {
+        return this.annotations?.[Serializer.ESCAPE_KEY] as EscapedProperty | undefined;
     }
 
     private readonly allReferences = new Map<StringifiedPath, ObjectLike>();
@@ -49,38 +67,28 @@ export class Deserializer {
         return referencedValue;
     }
 
-    // TODO Should be working but I am not sure string paths are correctly escaped / unescaped.
-
     private deserializeChild(value: JsonValue, key: string): ObjectLike | Primitive {
         this.parentToValue.push(key);
-
-        let output: ObjectLike | Primitive;
-
-        const annotation = this.getAnnotation();
-        if (annotation !== undefined)
-            output = this.deserializeAnnotatedValue(value, annotation);
-        else if (typeof value !== 'object' || value === null)
-            output = value;
-        else if (Array.isArray(value))
-            output = this.deserializeArray(value);
-        else
-            output = this.deserializeObject(value);
-
+        const output = this.deserializeValue(value);
         this.parentToValue.pop();
+
         return output;
     }
 
-    // TODO rename
+    // #region Containers
+
     // TODO fix annotation types?
-    private deserializeObject(value: JsonObject): ObjectLike {
+    deserializePlainObject(value: JsonObject): Record<string, unknown> {
         const output = {} as Record<string, unknown>;
         this.setReference(output);
+
+        const prevAnnotations = this.annotations;
+        this.annotations = value[Serializer.ESCAPE_KEY] as Annotations<typeof Serializer.ESCAPE_KEY> | undefined;
 
         const prevPathFromParent = this.parentToValue;
         this.rootToParent.push(...prevPathFromParent);
         this.parentToValue = [];
 
-        this.annotations = value[Serializer.ESCAPE_KEY] as Annotations<typeof Serializer.ESCAPE_KEY> | undefined;
 
         for (const [ key, item ] of Object.entries(value)) {
             if (key === Serializer.ESCAPE_KEY)
@@ -89,7 +97,11 @@ export class Deserializer {
             output[key] = this.deserializeChild(item, key);
         }
 
-        // TODO if annotations have control object ...
+        const escapedProperty = this.getEscapedProperty();
+        if (escapedProperty)
+            output[Serializer.ESCAPE_KEY] = this.deserializeChild(escapedProperty.value!, Serializer.ESCAPE_KEY);
+
+        this.annotations = prevAnnotations;
 
         this.parentToValue = prevPathFromParent;
         this.rootToParent.splice(this.rootToParent.length - this.parentToValue.length, this.parentToValue.length);
@@ -97,7 +109,7 @@ export class Deserializer {
         return output;
     }
 
-    private deserializeArray(value: JsonArray): ObjectLike {
+    deserializeArray(value: JsonArray): unknown[] {
         const output = Array(value.length);
         this.setReference(output);
 
@@ -107,39 +119,7 @@ export class Deserializer {
         return output;
     }
 
-    private deserializeAnnotatedValue(value: JsonValue, annotation: Annotation): ObjectLike | Primitive {
-        const type = typeof annotation === 'string' ? annotation : annotation[0];
-
-        switch (type) {
-            case Serializer.REFERENCE_ANNOTATION:
-                return this.deserializeReference(annotation);
-            case Serializer.SET_ANNOTATION:
-                return this.deserializeSet(value as JsonArray);
-            case Serializer.MAP_ANNOTATION:
-                return this.deserializeMap(value as [JsonValue, JsonValue][]);
-            case Serializer.UNDEFINED_ANNOTATION:
-                return undefined;
-            case Serializer.NUMBER_ANNOTATION:
-                return this.deserializeNumber(value as string);
-            case Serializer.BIGINT_ANNOTATION:
-                if (typeof value !== 'string')
-                    throw new Error(`Invalid bigint value: ${value}`);
-
-                return BigInt(value);
-            case Serializer.DATE_ANNOTATION:
-                if (typeof value !== 'string')
-                    throw new Error(`Invalid date value: ${value}`);
-
-                return new Date(value);
-            case Serializer.REGEXP_ANNOTATION:
-                return this.deserializeRegExp(value as string);
-            default:
-                // TODO deserialize custom type
-                return this.deserializeCustomType(value, annotation);
-        }
-    }
-
-    private deserializeSet(value: JsonArray): Set<unknown> {
+    deserializeSet(value: JsonArray): Set<unknown> {
         const output = new Set();
         this.setReference(output);
 
@@ -151,7 +131,7 @@ export class Deserializer {
         return output;
     }
 
-    private deserializeMap(value: [JsonValue, JsonValue][]): Map<unknown, unknown> {
+    deserializeMap(value: JsonMap): Map<unknown, unknown> {
         const output = new Map();
         this.setReference(output);
 
@@ -171,6 +151,46 @@ export class Deserializer {
         return output;
     }
 
+    // #endregion
+
+    private deserializeValue(value: JsonValue): ObjectLike | Primitive {
+        const annotation = this.getAnnotation();
+        if (annotation !== undefined)
+            return this.deserializeAnnotatedValue(value, annotation);
+        if (typeof value !== 'object' || value === null)
+            return value;
+        if (Array.isArray(value))
+            return this.deserializeArray(value);
+        return this.deserializePlainObject(value);
+    }
+
+    private deserializeAnnotatedValue(value: JsonValue, annotation: Annotation): ObjectLike | Primitive {
+        const typeName = typeof annotation === 'string' ? annotation : annotation[0];
+
+        switch (typeName) {
+            case Serializer.REFERENCE_ANNOTATION:
+                return this.deserializeReference(annotation);
+            case Serializer.UNDEFINED_ANNOTATION:
+                return undefined;
+            case Serializer.NUMBER_ANNOTATION:
+                return this.deserializeNumber(value as string);
+            case Serializer.BIGINT_ANNOTATION:
+                if (typeof value !== 'string')
+                    throw new Error(`Invalid bigint value: ${value}`);
+
+                return BigInt(value);
+            default: {
+                const transformer = this.uberJson.getTransformerForAnnotation(typeName);
+                const output = transformer.deserialize(value, annotation, this);
+
+                if (transformer.isReferenceType)
+                    this.setReference(output);
+
+                return output;
+            }
+        }
+    }
+
     private deserializeNumber(value: string): number {
         switch (value) {
             case Serializer.PLUS_INFINITY:
@@ -184,22 +204,5 @@ export class Deserializer {
             default:
                 throw new Error(`Invalid number value: ${value}`);
         }
-    }
-
-    private deserializeRegExp(value: string): RegExp {
-        const body = value.slice(1, value.lastIndexOf('/'));
-        const flags = value.slice(value.lastIndexOf('/') + 1);
-        return new RegExp(body, flags);
-    }
-
-    private deserializeURL(value: string): URL {
-        return new URL(value);
-    }
-
-    private deserializeCustomType(value: JsonValue, annotation: Annotation): ObjectLike {
-        // TODO if needed.
-        // this.setReference(output);
-        // TODO
-        return null;
     }
 }

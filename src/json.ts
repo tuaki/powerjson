@@ -1,9 +1,10 @@
 import type { StringifiedPath } from './path.js';
 
-export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
+export type JsonPrimitive = string | number | boolean | null;
 export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = JsonValue[];
+export type JsonMap = [JsonValue, JsonValue][];
 
 /**
  * String represents a standard annotation that doesn't need any additional value to be parsed.
@@ -11,15 +12,13 @@ export type JsonArray = JsonValue[];
  */
 export type Annotation = string | [string, ...JsonValue[]];
 
-export type ControlObject = {
-    /** If the top-level value isn't a plain object, we have to wrap it (and then unwrap it) */
-    isWrapped?: boolean;
-    /** If an object key is the escape key, we move it here instead. */
+/** If an object key is the escape key, we move its value and annotation here instead. */
+export type EscapedProperty = {
+    /** This has to be defined after serialization, but not necessarily during the process. */
     value?: JsonValue;
-    /** If the value needs annotation, we store it here. */
     annotation?: Annotation;
 };
 
-export type Annotations<TEscape extends string> = Record<StringifiedPath, Annotation> & { [key in TEscape]?: ControlObject };
+export type Annotations<TEscape extends string> = Record<StringifiedPath, Annotation> & { [key in TEscape]?: EscapedProperty | 'wrapped' };
 
 export type AnnotatedJsonObject<TEscape extends string> = JsonObject & { [key in TEscape]?: Annotations<TEscape> };
