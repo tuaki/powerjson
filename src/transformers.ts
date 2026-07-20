@@ -10,10 +10,14 @@ export type Primitive = undefined | null | string | number | boolean | bigint | 
  */
 export type ObjectLike = object;
 
-export type Transformer<TType extends ObjectLike = ObjectLike> = {
-    // TODO types
-    // Use the type or its prototype?
-    type: object & { prototype: ObjectLike };
+export type Constructor<T = unknown> = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- This is needed for `new` operator. Nothing else really works.
+    new (...args: any[]): T;
+};
+
+export type Transformer<TObject extends ObjectLike = ObjectLike> = {
+    // TODO Use the type or its prototype?
+    type: Constructor<TObject>;
     annotation: string | undefined;
     /**
      * Reference types are subject to deduplication and circular reference detection. Value types are not.
@@ -24,21 +28,20 @@ export type Transformer<TType extends ObjectLike = ObjectLike> = {
      * If undefined is returned, the value will be skipped from objects, sets, and maps. However, it will be kept in arrays as `null` to preserve indexes.
      * Try `JSON.stringify({ a: undefined })` and `JSON.stringify([ undefined ])` to see the difference.
      */
-    serialize(value: TType, serializer: Serializer): JsonValue | undefined;
+    serialize(value: TObject, serializer: Serializer): JsonValue | undefined;
     /**
      * Deserializes the value from a JSON value and an annotation.
      */
-    deserialize(value: JsonValue, annotation: Annotation, deserializer: Deserializer): TType;
+    deserialize(value: JsonValue, annotation: Annotation, deserializer: Deserializer): TObject;
 };
 
-// TODO rename TType2
-function transformer<TType extends ObjectLike, TType2 extends JsonValue>(
-    type: object & { prototype: ObjectLike },
+function transformer<TObject extends ObjectLike, TJson extends JsonValue>(
+    type: Constructor<TObject>,
     annotation: string | undefined,
     isReferenceType: boolean,
-    serialize: (value: TType, serializer: Serializer) => TType2 | undefined,
-    deserialize: (value: TType2, annotation: Annotation, deserializer: Deserializer) => TType,
-): Transformer<TType> {
+    serialize: (value: TObject, serializer: Serializer) => TJson | undefined,
+    deserialize: (value: TJson, annotation: Annotation, deserializer: Deserializer) => TObject,
+): Transformer<TObject> {
     return {
         type,
         annotation,
@@ -57,19 +60,29 @@ function transformer<TType extends ObjectLike, TType2 extends JsonValue>(
 // #region Containers
 
 const plainObjectTransformer = transformer(
-    Object,
+    // NICE_TO_HAVE Not pretty.
+    Object as unknown as Constructor<Record<string, unknown>>,
     undefined,
     true,
     (value: Record<string, unknown>, serializer: Serializer) => serializer.serializePlainObject(value),
-    (value: JsonObject, annotation: Annotation, deserializer: Deserializer) => deserializer.deserializePlainObject(value),
+    (value: JsonObject, _: Annotation, deserializer: Deserializer) => deserializer.deserializePlainObject(value),
 );
+
+/**
+ * We should check object keys whenever we directly write to them like `object[key] = ...`.
+ * see https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/Prototype_pollution
+ */
+export function validateObjectKey(key: string) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype')
+        throw new Error(`Invalid object key: ${key}. Remove it to avoid prototype pollution.`);
+}
 
 const arrayTransformer = transformer(
     Array,
     undefined,
     true,
     (value: unknown[], serializer: Serializer) => serializer.serializeArray(value),
-    (value: JsonArray, annotation: Annotation, deserializer: Deserializer) => deserializer.deserializeArray(value),
+    (value: JsonArray, _: Annotation, deserializer: Deserializer) => deserializer.deserializeArray(value),
 );
 
 const setTransformer = transformer(
@@ -77,7 +90,7 @@ const setTransformer = transformer(
     'Set',
     true,
     (value: Set<unknown>, serializer: Serializer) => serializer.serializeSet(value),
-    (value: JsonArray, annotation: Annotation, deserializer: Deserializer) => deserializer.deserializeSet(value),
+    (value: JsonArray, _: Annotation, deserializer: Deserializer) => deserializer.deserializeSet(value),
 );
 
 const mapTransformer = transformer(
@@ -85,7 +98,7 @@ const mapTransformer = transformer(
     'Map',
     true,
     (value: Map<unknown, unknown>, serializer: Serializer) => serializer.serializeMap(value),
-    (value: JsonMap, annotation: Annotation, deserializer: Deserializer) => deserializer.deserializeMap(value),
+    (value: JsonMap, _: Annotation, deserializer: Deserializer) => deserializer.deserializeMap(value),
 );
 
 // #endregion
@@ -94,7 +107,7 @@ const mapTransformer = transformer(
 const dateTransformer = transformer(
     Date,
     'Date',
-    true,
+    false,
     (value: Date): string | null => {
         // Date can be invalid; let's serialize it as null.
         return isNaN(+value) ? null : value.toISOString();
@@ -107,7 +120,7 @@ const dateTransformer = transformer(
 const regexpTransformer = transformer(
     RegExp,
     'RegExp',
-    true,
+    false,
     (value: RegExp): string => {
         // Returns a string in the form of `/pattern/flags`.
         return value.toString();
@@ -122,7 +135,7 @@ const regexpTransformer = transformer(
 const urlTransformer = transformer(
     URL,
     'URL',
-    true,
+    false,
     (value: URL): string => {
         return value.toString();
     },

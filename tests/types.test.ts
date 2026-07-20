@@ -1,5 +1,5 @@
 import { expect, test, describe } from 'bun:test';
-import { uberJson } from '../src/uberJson.js';
+import { UberJson } from '../src/uberJson.js';
 import type { Annotations, JsonArray, JsonMap } from '../src/json.js';
 import { testSerializeDeserialize, wrap } from './utils.js';
 
@@ -61,14 +61,6 @@ describe('containers', () => {
         [ { 'a.b': 1, 'c\\d': 2 }, { 'a.b': 1, 'c\\d': 2 } ],
         [ { 'a.b': NaN, 'c\\d': NaN }, { 'a.b': 'NaN', 'c\\d': 'NaN', $: { 'a\\.b': 'number', 'c\\\\d': 'number' } } ],
     ])('object %p', (input, expected) => {
-        testSerializeDeserialize({ input }, { input: expected });
-        testSerializeDeserialize(input, expected);
-    });
-
-    test.each([
-        [ { $: NaN }, { $: { $: { value: 'NaN', annotation: 'number' } } } ],
-        [ { $: [ NaN ] }, { $: { $: { value: [ 'NaN' ] }, '$.0': 'number' } } ],
-    ])('object with escape key %p', (input, expected) => {
         testSerializeDeserialize({ input }, { input: expected });
         testSerializeDeserialize(input, expected);
     });
@@ -161,6 +153,15 @@ describe('containers', () => {
         [ [ 'key', [ undefined ] ], [ [ undefined ], 'input' ] ],
         [ [ 'key', [ null ] ], [ [ null ], 'input' ] ],
         { 'input.0.1.0': 'undefined', 'input.1.0.0': 'undefined' },
+        // TODO This fails right now because of a bug in bun.
+        // see https://github.com/oven-sh/bun/issues/34830
+        // A copy of superjson test. It works in both libraries, but differently.
+        // - They treat regexes as references, so their keys are unique.
+        // - We treat regexes as values, however, internally are still references. So, they are still unique keys.
+        // ], [
+        //     [ [ /a/g, 'foo' ], [ /a/g, 'bar' ] ],
+        //     [ [ '/a/g', 'foo' ], [ '/a/g', 'bar' ] ],
+        //     { 'input.0.0': 'RegExp', 'input.1.0': 'RegExp' },
     ] ])('map %p to %p', (input, expected, annotations) => {
         testSerializeDeserialize({ input: new Map(input) }, {
             $: { input: 'Map', ...annotations },
@@ -178,6 +179,48 @@ describe('containers', () => {
         { 'w.0.1.0': 'undefined', 'w.1.0.0': 'undefined' },
     ] ])('root map %p to %p', (input, expected, annotations) => {
         testSerializeDeserialize(new Map(input), wrap(expected, { w: 'Map', ...annotations }));
+    });
+});
+
+describe('special objects', () => {
+    test.each([
+        [ { $: NaN }, { $: { $: { value: 'NaN', annotation: 'number' } } } ],
+        [ { $: [ NaN ] }, { $: { $: { value: [ 'NaN' ] }, '$.0': 'number' } } ],
+    ])('object with escape key %p', (input, expected) => {
+        testSerializeDeserialize({ input }, { input: expected });
+        testSerializeDeserialize(input, expected);
+    });
+
+    test('annotation is the first key', () => {
+        const input = { a: 1, b: NaN };
+        const output = UberJson.serialize(input);
+        expect(Object.keys(output)).toEqual([ '$', 'a', 'b' ]);
+    });
+
+    test('object with null prototype', () => {
+        const input: Record<string, unknown> = Object.create(null);
+        input.date = new Date('2000-01-01T00:00:00.000Z');
+
+        const output = UberJson.parse<{ date: Date }>(UberJson.stringify(input));
+
+        expect(output.date).toBeInstanceOf(Date);
+        expect(output.date.toISOString()).toBe('2000-01-01T00:00:00.000Z');
+    });
+
+    const forbiddenObjectKeys = [ '__proto__', 'prototype', 'constructor' ];
+
+    test.each(forbiddenObjectKeys)('serialization rejects forbidden key %s', forbiddenKey => {
+        const input: Record<string, unknown> = Object.create(null);
+        input[forbiddenKey] = 1;
+
+        expect(() => UberJson.serialize(input)).toThrowError(new RegExp(forbiddenKey));
+    });
+
+    test.each(forbiddenObjectKeys)('deserialization rejects forbidden key %s', forbiddenKey => {
+        const inputJson = `{ "${forbiddenKey}": 1 }`;
+
+        expect(() => UberJson.parse(inputJson)).toThrowError(new RegExp(forbiddenKey));
+        expect((Object.prototype as Record<string, unknown>).value).toBeUndefined();
     });
 });
 
@@ -204,6 +247,7 @@ describe('typed arrays', () => {
         [ new Float64Array([ 0.123, 1.456 ]), 'sHJoke18vz-yne-nxkv3Pw==' ],
         [ new Float64Array([ -0, Infinity, -Infinity ]), 'AAAAAAAAAIAAAAAAAADwfwAAAAAAAPD_' ],
         // TODO For some reason, NaN fails. Maybe bun uses a different NaN comparison for Float64Array?
+        // see https://github.com/oven-sh/bun/issues/34815
         // [ new Float64Array([ NaN ]), 'AAAAAAAA-H8=' ],
         // [ new Float64Array([ NaN, -0, Infinity, -Infinity ]), 'AAAAAAAA-H8AAAAAAAAAgAAAAAAAAPB_AAAAAAAA8P8=' ],
         [ new Float64Array([ Number.MAX_SAFE_INTEGER * 2 ]), '________T0M=' ],
@@ -221,6 +265,7 @@ describe('predefined types', () => {
         [ new Date('2000-01-01T00:00:00.000Z'), '2000-01-01T00:00:00.000Z' ],
         [ new Date('1234-12-12T12:34:56.789Z'), '1234-12-12T12:34:56.789Z' ],
         // TODO toEqual returns false for two invalid dates (even though it returns true for two NaNs).
+        // see https://github.com/oven-sh/bun/issues/34816
         // Once it's fixed, unify this test with the one below.
         // [ new Date(NaN), null ],
     ])('Date %p to %p', (input, expected) => {
@@ -232,7 +277,7 @@ describe('predefined types', () => {
     });
 
     test('Invalid date', () => {
-        expect(uberJson.serialize({ input: new Date(NaN) })).toEqual({
+        expect(UberJson.serialize({ input: new Date(NaN) })).toEqual({
             $: { input: 'Date' },
             input: null,
         });
@@ -260,6 +305,7 @@ describe('predefined types', () => {
         testSerializeDeserialize(input, wrap(expected, { w: 'URL' }));
     });
 
+    // TODO
     // test.each([
     //     [ new Error('error message'), 'error message' ],
     // ])('Error %p to %p', (input, expected) => {

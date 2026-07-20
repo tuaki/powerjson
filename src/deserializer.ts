@@ -1,7 +1,7 @@
 import type { AnnotatedJsonObject, Annotation, Annotations, EscapedProperty, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
 import { stringifyPath, type Path, type StringifiedPath } from './path.js';
 import { Serializer } from './serializer.js';
-import type { ObjectLike, Primitive } from './transformers.js';
+import { validateObjectKey, type ObjectLike, type Primitive } from './transformers.js';
 import type { UberJson } from './uberJson.js';
 
 export class Deserializer {
@@ -28,13 +28,10 @@ export class Deserializer {
 
         const key = stringifyPath(this.parentToValue);
 
-        if (key === Serializer.ESCAPE_KEY) {
-            const escapedProperty = this.annotations[Serializer.ESCAPE_KEY] as EscapedProperty;
-            return escapedProperty?.annotation;
-        }
-        else {
+        if (key === Serializer.ESCAPE_KEY)
+            return this.getEscapedProperty()?.annotation;
+        else
             return this.annotations[key];
-        }
     }
 
     private getEscapedProperty(): EscapedProperty | undefined {
@@ -89,8 +86,9 @@ export class Deserializer {
         this.rootToParent.push(...prevPathFromParent);
         this.parentToValue = [];
 
-
         for (const [ key, item ] of Object.entries(value)) {
+            validateObjectKey(key);
+
             if (key === Serializer.ESCAPE_KEY)
                 continue;
 
@@ -175,10 +173,7 @@ export class Deserializer {
             case Serializer.NUMBER_ANNOTATION:
                 return this.deserializeNumber(value as string);
             case Serializer.BIGINT_ANNOTATION:
-                if (typeof value !== 'string')
-                    throw new Error(`Invalid bigint value: ${value}`);
-
-                return BigInt(value);
+                return BigInt(value as string);
             default: {
                 const transformer = this.uberJson.getTransformerForAnnotation(typeName);
                 const output = transformer.deserialize(value, annotation, this);

@@ -1,9 +1,7 @@
 import { expect, test, describe } from 'bun:test';
-import { testSerializeDeserialize } from './utils.js';
+import { nonReferenceTypes, testReferences, testSerializeDeserialize } from './utils.js';
 import { UberJson } from '../src/uberJson.js';
 import SuperJson from 'superjson';
-
-// TODO Deep reference equality tests.
 
 describe('circular references', () => {
     const a: Record<string, unknown> = { name: 'a' };
@@ -137,6 +135,7 @@ describe('reference objects', () => {
         expect(Object.keys(objectAccess)).toEqual([ '0', 'a', 'value', 'b' ]);
         expect(Object.keys(output.array)).toEqual([ '0' ]);
 
+        // This is an error in superJson.
         const incorrect = superJson.deserialize(superJson.serialize(input)) as typeof input;
         expect(incorrect).toEqual(input);
         // Reference objects are omitted from the actualy array, but are preserved as references and added back as `NaN`.
@@ -154,6 +153,7 @@ describe('reference objects', () => {
         // No testing for equality as the comparer doesn't handle references as keys.
         expect([ ...output.map.values() ]).toEqual([ 'a', 'b' ]);
 
+        // This is an error in superJson.
         const incorrect = superJson.deserialize(superJson.serialize(input)) as typeof input;
         // During deserialization, superJson first transforms maps into Map objects and only after that applies deduplication.
         // However, if multiple references are used as map keys, all of them are serialized as `null`. When the map is created, all nulls are mapped to the same key. Deduplication after that won't fix this.
@@ -162,5 +162,98 @@ describe('reference objects', () => {
 });
 
 describe('deduplication', () => {
-    // TODO
+    const uberJson = new UberJson({ deduplicate: true });
+
+    test('preserves references in containers', () => {
+        const sharedObject = { name: 'shared' };
+        const uniqueObject = { name: 'unique' };
+        const sharedArray = [ sharedObject, uniqueObject ];
+        const uniqueArray = [ sharedObject, uniqueObject ];
+
+        const input = {
+            array: [ sharedObject, sharedObject, uniqueObject, sharedArray, sharedArray, uniqueArray ],
+            object: {
+                first: sharedObject,
+                second: uniqueObject,
+                sharedArray,
+                uniqueArray,
+            },
+        };
+
+        const output = uberJson.parse(uberJson.stringify(input));
+
+        expect(output).toEqual(input);
+        testReferences(input, output);
+    });
+
+    test('preserves references in maps and sets', () => {
+        const shared: Record<string, unknown> = { name: 'shared' };
+        shared.self = shared;
+
+        const set = new Set([ shared ]);
+        const map = new Map<unknown, unknown>([
+            [ shared, set ],
+            [ set, shared ],
+        ]);
+
+        const input = {
+            shared,
+            set,
+            map,
+            array: [ shared, set, map ],
+        };
+
+        const output = uberJson.parse(uberJson.stringify(input));
+
+        expect(output).toEqual(input);
+        testReferences(input, output);
+    });
+
+    test('preserves references for keys that need path escaping', () => {
+        const shared = { value: 1 };
+
+        const input = {
+            'a.b': shared,
+            a: {
+                b: { value: 2 },
+            },
+            'a.b\\': shared,
+            nested: {
+                'c.d': shared,
+            },
+        };
+
+        const output = uberJson.parse(uberJson.stringify(input));
+
+        expect(output).toEqual(input);
+        testReferences(input, output);
+    });
+
+    test('finds references behind excluded wrappers', () => {
+        class Wrapper {
+            constructor(readonly value: unknown) {}
+
+            self?: unknown;
+        }
+
+        const sharedA = { value: 1 };
+        const wrapperA = new Wrapper(sharedA);
+        wrapperA.self = wrapperA;
+
+        const sharedBFromWrapper = { value: 1 };
+        const wrapperB = new Wrapper(sharedBFromWrapper);
+        wrapperB.self = wrapperB;
+
+        const a = {
+            direct: sharedA,
+            wrapper: wrapperA,
+        };
+        const b = {
+            direct: { value: 1 },
+            wrapper: wrapperB,
+        };
+
+        expect(a).toEqual(b);
+        expect(() => testReferences(a, b, [ ...nonReferenceTypes, Wrapper ])).toThrow();
+    });
 });

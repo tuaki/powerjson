@@ -1,6 +1,6 @@
-import type { AnnotatedJsonObject, Annotation, EscapedProperty, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
+import type { AnnotatedJsonObject, Annotation, Annotations, EscapedProperty, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
 import { stringifyPath, type Path, type StringifiedPath } from './path.js';
-import type { ObjectLike } from './transformers.js';
+import { validateObjectKey, type ObjectLike } from './transformers.js';
 import type { UberJson } from './uberJson.js';
 import { ensureProperty } from './utils.js';
 
@@ -43,32 +43,25 @@ export class Serializer {
     private readonly pathReferences = new Set<ObjectLike>();
 
     /**
-     * The object to which we write the annotations. Should be the last object in the path.
      * Needs to be explicitly set so don't forget about it!
      * This is done by calling {@link serializePlainObject} first.
      */
-    private parentObject!: AnnotatedJsonObject<typeof Serializer.ESCAPE_KEY>;
+    private annotations!: Annotations<typeof Serializer.ESCAPE_KEY>;
 
     static readonly ESCAPE_KEY = '$';
 
     addAnnotation(annotation: Annotation): void {
-        const annotations = ensureProperty(this.parentObject, Serializer.ESCAPE_KEY, {});
-
         // TODO not ideal
         const key = stringifyPath(this.parentToValue);
 
-        if (key === Serializer.ESCAPE_KEY) {
-            const escapedProperty = ensureProperty(annotations, Serializer.ESCAPE_KEY, {}) as EscapedProperty;
-            escapedProperty.annotation = annotation;
-        }
-        else {
-            annotations[key] = annotation;
-        }
+        if (key === Serializer.ESCAPE_KEY)
+            this.getEscapedProperty().annotation = annotation;
+        else
+            this.annotations[key] = annotation;
     }
 
     private getEscapedProperty(): EscapedProperty {
-        const annotations = ensureProperty(this.parentObject, Serializer.ESCAPE_KEY, {});
-        return ensureProperty(annotations, Serializer.ESCAPE_KEY, {}) as EscapedProperty;
+        return ensureProperty(this.annotations, Serializer.ESCAPE_KEY, {}) as EscapedProperty;
     }
 
     static readonly REFERENCE_ANNOTATION = 'ref';
@@ -93,10 +86,12 @@ export class Serializer {
     }
 
     private nextContext(): ContextOutput<typeof Serializer.ESCAPE_KEY> {
-        const currentObject = {};
+        // Explicitly creating the annotations also forces the escape key to be in the first position of each object. This is just a visual thing, but it makes it easier to read the output.
+        // If not needed, the annotations will be deleted later.
+        const currentObject: AnnotatedJsonObject<typeof Serializer.ESCAPE_KEY> = { [Serializer.ESCAPE_KEY]: {} };
 
-        const prevParentObject = this.parentObject;
-        this.parentObject = currentObject;
+        const prevAnnotations = this.annotations;
+        this.annotations = currentObject[Serializer.ESCAPE_KEY]!;
 
         const prevPathFromParent = this.parentToValue;
         this.rootToParent.push(...prevPathFromParent);
@@ -104,13 +99,15 @@ export class Serializer {
 
         return {
             currentObject,
-            prevParentObject,
+            prevAnnotations,
             prevPathFromParent,
         };
     }
 
     private prevContext(context: ContextOutput<typeof Serializer.ESCAPE_KEY>): void {
-        this.parentObject = context.prevParentObject;
+        this.annotations = context.prevAnnotations;
+        if (Object.keys(context.currentObject[Serializer.ESCAPE_KEY]!).length === 0)
+            delete context.currentObject[Serializer.ESCAPE_KEY];
 
         this.parentToValue = context.prevPathFromParent;
         this.rootToParent.splice(this.rootToParent.length - this.parentToValue.length, this.parentToValue.length);
@@ -129,10 +126,7 @@ export class Serializer {
         const output = context.currentObject;
 
         for (const [ key, item ] of Object.entries(value)) {
-            if (BLACKLISTED_OBJECT_KEYS.has(key)) {
-                // TODO is this necessary?
-                throw new Error(`Detected property ${key}. This is a prototype pollution risk, please remove it from your object.`);
-            }
+            validateObjectKey(key);
 
             const serializedItem = this.serializeChild(item, key);
             if (serializedItem === undefined) {
@@ -287,12 +281,6 @@ export class Serializer {
 
 type ContextOutput<TEscape extends string> = {
     currentObject: AnnotatedJsonObject<TEscape>;
-    prevParentObject: AnnotatedJsonObject<TEscape>;
+    prevAnnotations: Annotations<TEscape>;
     prevPathFromParent: Path;
 };
-
-const BLACKLISTED_OBJECT_KEYS = new Set([
-    '__proto__',
-    'constructor',
-    'prototype',
-]);

@@ -35,8 +35,22 @@ export class UberJson {
     private readonly transformersByPrototype: Map<ObjectLike, Transformer> = new Map();
     private readonly transformersByAnnotation: Map<string, Transformer> = new Map();
 
-    addTransformer(transformer: Transformer): void {
-        this.transformersByPrototype.set(transformer.type.prototype, transformer);
+    /**
+     * Registers a transformer for a specific type.
+     * Unless override is set to true, it will throw an error if a transformer for the same type or annotation is already registered.
+     */
+    registerTransformer(transformer: Transformer, options?: { override?: boolean }): void {
+        const prototype = transformer.type.prototype;
+
+        if (!options?.override) {
+            if (this.transformersByPrototype.has(prototype))
+                throw new Error(`Transformer for type ${transformer.type.name} is already registered.`);
+
+            if (transformer.annotation !== undefined && this.transformersByAnnotation.has(transformer.annotation))
+                throw new Error(`Transformer for annotation ${transformer.annotation} is already registered.`);
+        }
+
+        this.transformersByPrototype.set(prototype, transformer);
         if (transformer.annotation !== undefined)
             this.transformersByAnnotation.set(transformer.annotation, transformer);
     }
@@ -86,8 +100,14 @@ export class UberJson {
         [
             ...Object.values(baseTransformers),
             ...typedArrayTransformers,
-        ].forEach(transformer => this.addTransformer(transformer));
+        ].forEach(transformer => this.registerTransformer(transformer));
     }
-}
 
-export const uberJson = new UberJson();
+    private static defaultInstance = new UberJson();
+
+    static serialize = UberJson.defaultInstance.serialize.bind(UberJson.defaultInstance);
+    static deserialize = UberJson.defaultInstance.deserialize.bind(UberJson.defaultInstance);
+    static stringify = UberJson.defaultInstance.stringify.bind(UberJson.defaultInstance);
+    static parse = UberJson.defaultInstance.parse.bind(UberJson.defaultInstance);
+    static registerTransformer = UberJson.defaultInstance.registerTransformer.bind(UberJson.defaultInstance);
+}
