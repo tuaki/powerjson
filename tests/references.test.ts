@@ -13,7 +13,7 @@ describe('circular references', () => {
             a: {
                 name: 'a',
                 b: {
-                    $: { 'a': [ 'ref', 'a' ] },
+                    $: { a: [ 'ref', 'a' ] },
                     name: 'b',
                     a: null,
                 },
@@ -25,7 +25,7 @@ describe('circular references', () => {
         testSerializeDeserialize(a, {
             name: 'a',
             b: {
-                $: { 'a': [ 'ref', '' ] },
+                $: { a: [ 'ref', '' ] },
                 name: 'b',
                 a: null,
             },
@@ -53,6 +53,50 @@ describe('circular references', () => {
         });
     });
 
+    test('3 objects', () => {
+        // It seems unnecessary but this actually solved a bug.
+        const input = { name: 'root', childA: a, childB: b };
+        const expectedSerialized = {
+            name: 'root',
+            childA: {
+                b: {
+                    $: { a: [ 'ref', 'childA' ] },
+                    a: null,
+                    name: 'b',
+                },
+                name: 'a',
+            },
+            childB: {
+                a: {
+                    $: { b: [ 'ref', 'childA.b' ] },
+                    b: null,
+                    name: 'a',
+                },
+                name: 'b',
+            },
+        };
+
+        const serialized = UberJson.serialize(input);
+        expect(serialized).toEqual(expectedSerialized);
+
+        const parsed = JSON.parse(JSON.stringify(serialized));
+        expect(() => UberJson.deserialize(parsed)).not.toThrow();
+        // Further equivalence checks aren't possible due to circular references.
+        // We also can't chceck references, because they are not preserved in full (`deduplicate` is false).
+    });
+
+    test('3 objects, deduplicate', () => {
+        const uberJson = new UberJson({ deduplicate: true });
+        const input = { name: 'root', childA: a, childB: b };
+
+        const serialized = uberJson.serialize(input);
+        const parsed = JSON.parse(JSON.stringify(serialized));
+
+        const deserialized = uberJson.deserialize(parsed);
+        expect(deserialized).toEqual(input);
+
+        testReferences(input, deserialized);
+    });
 
     test('2 arrays', () => {
         const x: unknown[] = [ 'x' ];
@@ -67,7 +111,6 @@ describe('circular references', () => {
             ],
         });
     });
-
 
     test('1 array', () => {
         const z: unknown[] = [ 'z' ];

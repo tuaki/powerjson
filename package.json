@@ -5,13 +5,13 @@
         "types": "bun tsc --build --verbose",
         "lint": "bun run eslint eslint.config.ts --fix"
     },
-    "dependencies": {
-    },
+    "dependencies": {},
     "devDependencies": {
         "@eslint/js": "^10.0.1",
+        "@faker-js/faker": "^10.5.0",
         "@stylistic/eslint-plugin": "^5.10.0",
-        "eslint": "^10.6.0",
         "@types/bun": "^1.3.14",
+        "eslint": "^10.6.0",
         "jiti": "^2.7.0",
         "superjson": "^2.2.6",
         "typescript": "^6.0.3",

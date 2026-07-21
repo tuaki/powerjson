@@ -68,18 +68,19 @@ export class Serializer {
 
     private tryCreateReference(value: ObjectLike): boolean {
         if (this.allReferences.has(value)) {
-            // If this is a cyclic reference, we have to deduplicate it.
+            // We have already seen this object. It might be a circular reference. If it is, we have to deduplicate it.
             const deduplicate = this.uberJson.deduplicate || this.pathReferences.has(value);
             if (deduplicate) {
                 const reference = this.allReferences.get(value)!;
                 this.addAnnotation([ Serializer.REFERENCE_ANNOTATION, reference ]);
                 return true;
             }
-
-            return false;
+        }
+        else {
+            // Never seen this one before.
+            this.allReferences.set(value, stringifyPath([ ...this.rootToParent, ...this.parentToValue ]));
         }
 
-        this.allReferences.set(value, stringifyPath([ ...this.rootToParent, ...this.parentToValue ]));
         this.pathReferences.add(value);
 
         return false;

@@ -155,7 +155,7 @@ describe('containers', () => {
         { 'input.0.1.0': 'undefined', 'input.1.0.0': 'undefined' },
         // TODO This fails right now because of a bug in bun.
         // see https://github.com/oven-sh/bun/issues/34830
-        // A copy of superjson test. It works in both libraries, but differently.
+        // A copy of a superJson test. It works in both libraries, but differently.
         // - They treat regexes as references, so their keys are unique.
         // - We treat regexes as values, however, internally are still references. So, they are still unique keys.
         // ], [
