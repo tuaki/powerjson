@@ -1,4 +1,4 @@
-import { BENCHMARK_ITERATIONS_SCALE, DISPLAY_ERRORS, DISPLAY_VERBOSE_RESULTS } from './config.js';
+import { BENCHMARK_ITERATIONS_SCALE, DISPLAY_ERROR_STACKS, DISPLAY_VERBOSE_RESULTS } from './config.js';
 import { formatSize, formatTime, selectSizeUnit, selectTimeUnit, type SizeUnit, type TimeUnit } from './utils.js';
 
 type InputValue = unknown;
@@ -9,7 +9,6 @@ type Serializer<TSerialized = unknown> = {
     deserialize(value: TSerialized): InputValue;
     toJson(value: TSerialized): string;
     fromJson(text: string): TSerialized;
-    skip?(scenario: Scenario): boolean;
 };
 
 export function createSerializer<TSerialized>(
@@ -26,7 +25,7 @@ export type Scenario = {
     id: string;
     name: string;
     description: string;
-    jsonCompatible: boolean;
+    skipSerializers?: string[];
     /** Number of iterations for which the results are stable enough. */
     iterations: number;
     /** If array is returned, it will be serialized by items (we measure the total time). */
@@ -34,27 +33,21 @@ export type Scenario = {
 };
 
 export function runScenarios(scenarios: Scenario[], serializers: Serializer[]): ScenarioResult[] {
-    if (DISPLAY_VERBOSE_RESULTS)
-        console.log(`Running ${scenarios.length} benchmark scenarios...`);
+    console.log(`Running ${scenarios.length} benchmark scenarios...`);
 
     const results: ScenarioResult[] = [];
 
     for (const scenario of scenarios) {
-        try {
-            if (DISPLAY_VERBOSE_RESULTS) {
-                console.log('');
-                console.log(`Scenario: ${scenario.name}`);
-                console.log(scenario.description);
-            }
+        if (DISPLAY_VERBOSE_RESULTS) {
+            console.log('');
+            console.log(`Scenario: ${scenario.name}`);
+            console.log(scenario.description);
+        }
 
-            const result = runScenario(scenario, serializers);
-            results.push(result);
-            if (DISPLAY_VERBOSE_RESULTS)
-                printScenarioResults(result);
-        }
-        catch (error) {
-            printError(`Error running scenario '${scenario.name}'.`, error);
-        }
+        const result = runScenario(scenario, serializers);
+        results.push(result);
+        if (DISPLAY_VERBOSE_RESULTS)
+            printScenarioResults(result, serializers);
     }
 
     return results;
@@ -72,24 +65,11 @@ function runScenario(scenario: Scenario, serializers: Serializer[]): ScenarioRes
     const results: SerializerResult[] = [];
 
     for (const serializer of serializers) {
-        if (serializer.skip?.(scenario))
+        if (scenario.skipSerializers?.includes(serializer.name))
             continue;
 
-        try {
-            const serializerResult = measureSerializer(serializer, items, warmupIterations);
-            results.push(serializerResult);
-        }
-        catch (error) {
-            printError(`Error measuring serializer '${serializer.name}' for scenario '${scenario.name}'.`, error);
-            results.push({
-                serializer: serializer.name,
-                serializeMs: NaN,
-                toJsonMs: NaN,
-                deserializeMs: NaN,
-                fromJsonMs: NaN,
-                stringSizeBytes: NaN,
-            });
-        }
+        const serializerResult = measureSerializer(scenario.name, serializer, items, warmupIterations);
+        results.push(serializerResult);
     }
 
     return {
@@ -107,7 +87,7 @@ export type SerializerResult = {
     stringSizeBytes: number;
 };
 
-function measureSerializer(serializer: Serializer, items: InputValue[] | InputValue[][], warmupIterations: number): SerializerResult {
+function measureSerializer(scenarioName: string, serializer: Serializer, items: InputValue[] | InputValue[][], warmupIterations: number): SerializerResult {
     // The serializers should never mutate the input values. However, they might mutate the outputs (e.g., superJson uses in-place deserialization).
     // To avoid any issues, we just generate a new input for each iteration.
     // However, we don't wan't to call `getData` multiple times because it might would produce different data each time. Yes, we can fix it with an explicit faker instance, but let's just move on.
@@ -115,24 +95,42 @@ function measureSerializer(serializer: Serializer, items: InputValue[] | InputVa
     const warmupItems = items.slice(0, warmupIterations);
     const testItems = items.slice(warmupIterations);
 
-    warmUpSerializer(serializer, warmupItems);
+    try {
+        warmUpSerializer(serializer, warmupItems);
+    }
+    catch {
+        // Warmup errors are not critical.
+    }
 
-    const [ serializeMs, serialized ] = measureFunction(testItems, value => serializer.serialize(value));
-    const [ toJsonMs, json ] = measureFunction(serialized, value => serializer.toJson(value));
-
-    const stringSizeBytes = sumSizeBytes(json) / json.length;
-
-    const [ fromJsonMs, reserialized ] = measureFunction(json, value => serializer.fromJson(value));
-    const [ deserializeMs ] = measureFunction(reserialized, value => serializer.deserialize(value));
-
-    return {
+    const result: SerializerResult = {
         serializer: serializer.name,
-        serializeMs,
-        deserializeMs,
-        toJsonMs,
-        fromJsonMs,
-        stringSizeBytes,
+        serializeMs: NaN,
+        deserializeMs: NaN,
+        toJsonMs: NaN,
+        fromJsonMs: NaN,
+        stringSizeBytes: NaN,
     };
+
+    try {
+        const [ serializeMs, serialized ] = measureFunction(testItems, value => serializer.serialize(value));
+        result.serializeMs = serializeMs;
+
+        const [ toJsonMs, json ] = measureFunction(serialized, value => serializer.toJson(value));
+        result.toJsonMs = toJsonMs;
+
+        result.stringSizeBytes = sumSizeBytes(json) / json.length;
+
+        const [ fromJsonMs, reserialized ] = measureFunction(json, value => serializer.fromJson(value));
+        result.fromJsonMs = fromJsonMs;
+
+        const [ deserializeMs ] = measureFunction(reserialized, value => serializer.deserialize(value));
+        result.deserializeMs = deserializeMs;
+    }
+    catch (error) {
+        printError(`Error measuring serializer '${serializer.name}' for scenario '${scenarioName}'.`, error);
+    }
+
+    return result;
 }
 
 const WARMUP_ITERATIONS_RATIO = 0.1;
@@ -207,13 +205,13 @@ function getUtf8ByteLength(value: string): number {
 }
 
 function printError(message: string, error: unknown) {
-    if (DISPLAY_ERRORS)
+    if (DISPLAY_ERROR_STACKS)
         console.error(message, '\n', error);
     else
         console.error(message);
 }
 
-function printScenarioResults(result: ScenarioResult) {
+function printScenarioResults(result: ScenarioResult, serializers: Serializer[]) {
     const timeUnit = selectTimeUnit(result.results.flatMap(result => [
         result.serializeMs,
         result.toJsonMs,
@@ -222,10 +220,25 @@ function printScenarioResults(result: ScenarioResult) {
     ]));
     const sizeUnit = selectSizeUnit(result.results.map(result => result.stringSizeBytes));
 
-    console.table(result.results.map(serializerResult => mapSerializerResultToTableRow(serializerResult, timeUnit, sizeUnit)));
+    console.table(serializers.map(serializer => mapSerializerResultToTableRow(serializer, result.results, timeUnit, sizeUnit)));
 }
 
-function mapSerializerResultToTableRow(result: SerializerResult, timeUnit: TimeUnit, sizeUnit: SizeUnit) {
+function mapSerializerResultToTableRow(serializer: Serializer, results: SerializerResult[], timeUnit: TimeUnit, sizeUnit: SizeUnit) {
+    const result = results.find(r => r.serializer === serializer.name);
+    if (!result) {
+        return {
+            serializer: serializer.name,
+            serialize: '-',
+            toJson: '-',
+            deserialize: '-',
+            fromJson: '-',
+            stringify: '-',
+            parse: '-',
+            [`total (${timeUnit.label})`]: '-',
+            [`size (${sizeUnit.label})`]: '-',
+        };
+    }
+
     const stringifyMs = result.serializeMs + result.toJsonMs;
     const parseMs = result.deserializeMs + result.fromJsonMs;
     const totalMs = stringifyMs + parseMs;

@@ -6,7 +6,6 @@ export function realisticApiCallScenario(): Scenario {
         id: 'realistic-api-call',
         name: 'Realistic API Call',
         description: 'A batch of realistic API call objects with embedded customers, Dates, undefined values, and integer cents.',
-        jsonCompatible: true,
         iterations: 200,
         getData: createRealisticApiCalls,
     };

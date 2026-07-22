@@ -10,7 +10,7 @@ export type JsonMap = [JsonValue, JsonValue][];
  * String represents a standard annotation that doesn't need any additional value to be parsed.
  * Otherwise, it's an array where the first value is the type and the rest are additional values needed to parse it.
  */
-export type Annotation = string | [string, ...JsonValue[]];
+export type Annotation = string;
 
 /** If an object key is the escape key, we move its value and annotation here instead. */
 export type EscapedProperty = {
@@ -19,6 +19,15 @@ export type EscapedProperty = {
     annotation?: Annotation;
 };
 
-export type Annotations<TEscape extends string> = Record<StringifiedPath, Annotation> & { [key in TEscape]?: EscapedProperty | 'wrapped' };
+export type Annotations = Record<StringifiedPath, Annotation> & { [ESCAPE_KEY]?: EscapedProperty | typeof WRAPPED_DIRECTIVE };
 
-export type AnnotatedJsonObject<TEscape extends string> = JsonObject & { [key in TEscape]?: Annotations<TEscape> };
+export type AnnotatedJsonObject = JsonObject & { [ESCAPE_KEY]?: Annotations };
+
+export const ESCAPE_KEY = '$';
+export const WRAPPED_KEY = 'w';
+export const WRAPPED_DIRECTIVE = 'wrapped';
+
+export const REFERENCE_ANNOTATION: Annotation = 'ref';
+export const UNDEFINED_ANNOTATION: Annotation = 'undefined';
+export const NUMBER_ANNOTATION: Annotation = 'number';
+export const BIGINT_ANNOTATION: Annotation = 'bigint';

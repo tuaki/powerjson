@@ -57,7 +57,6 @@ function printComparisonTable(results: ScenarioResult[], group: SerializerCompar
         const bestComparedByMetric = new Map(metrics.map(metric => [ metric.id, findMetricBestForSerializers(result.results, metric, group.serializers) ]));
         const bestGlobalByMetric = new Map(metrics.map(metric => [ metric.id, findMetricBest(result.results, metric) ]));
 
-
         let metricIndex = 0;
         for (const metric of metrics) {
 
@@ -67,11 +66,18 @@ function printComparisonTable(results: ScenarioResult[], group: SerializerCompar
 
             let serializerIndex = 0;
             for (const serializerName of group.serializers) {
-                const serializerResult = bySerializer.get(serializerName);
-                const rawValue = serializerResult ? metric.value(serializerResult) : NaN;
-                const text = formatMetricValue(rawValue, metric.unitType, unit);
+                const rowKey = `${String.fromCharCode('A'.charCodeAt(0) + serializerIndex)} ${metricIndex + 1}`;
 
-                row[`${String.fromCharCode('A'.charCodeAt(0) + serializerIndex)} ${metricIndex + 1}`] = highlightComparedValue(text, rawValue, bestCompared, bestGlobal);
+                const serializerResult = bySerializer.get(serializerName);
+                if (serializerResult === undefined) {
+                    row[rowKey] = '-';
+                }
+                else {
+                    const rawValue = metric.value(serializerResult);
+                    const text = formatMetricValue(rawValue, metric.unitType, unit);
+                    row[rowKey] = highlightComparedValue(text, rawValue, bestCompared, bestGlobal);
+                }
+
                 serializerIndex++;
             }
 
@@ -137,7 +143,7 @@ function isBest(value: number, best: number): boolean {
 
 function formatMetricValue(value: number, unitType: ComparisonUnit, unit: TimeUnit | SizeUnit): string {
     if (!Number.isFinite(value))
-        return 'n/a';
+        return 'NaN';
 
     return unitType === 'time' ? formatTime(value, unit as TimeUnit) : formatSize(value, unit as SizeUnit);
 }

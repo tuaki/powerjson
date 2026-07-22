@@ -84,7 +84,7 @@ describe('containers', () => {
         [ 1, [ [ undefined ], 2 ] ],
         [ 1, [ [ null ], 2 ] ],
         { 'input.1.0.0': 'undefined' },
-    ] ])('array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations<'$'>) => {
+    ] ])('array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
         testSerializeDeserialize({ input }, {
             $: annotations,
             input: expected,
@@ -99,7 +99,7 @@ describe('containers', () => {
         [ 1, [ [ undefined ], 2 ] ],
         [ 1, [ [ null ], 2 ] ],
         { 'w.1.0.0': 'undefined' },
-    ] ])('root array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations<'$'>) => {
+    ] ])('root array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
         testSerializeDeserialize(input, wrap(expected, annotations));
     });
 
@@ -125,7 +125,7 @@ describe('containers', () => {
         [ 1, [ [ undefined ], 2 ] ],
         [ 1, [ [ null ], 2 ] ],
         { 'input.1.0.0': 'undefined' },
-    ] ])('set %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations<'$'>) => {
+    ] ])('set %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
         testSerializeDeserialize({ input: new Set(input) }, {
             $: { input: 'Set', ...annotations },
             input: expected,
@@ -145,7 +145,7 @@ describe('containers', () => {
         testSerializeDeserialize(new Map(input), wrap(input, { w: 'Map' }));
     });
 
-    test.each<[[unknown, unknown][], JsonMap, Annotations<'$'>]>([ [
+    test.each<[[unknown, unknown][], JsonMap, Annotations]>([ [
         [ [ undefined, undefined ] ],
         [ [ null, null ] ],
         { 'input.0.0': 'undefined', 'input.0.1': 'undefined' },
@@ -169,7 +169,7 @@ describe('containers', () => {
         });
     });
 
-    test.each<[[unknown, unknown][], JsonMap, Annotations<'$'>]>([ [
+    test.each<[[unknown, unknown][], JsonMap, Annotations]>([ [
         [ [ undefined, undefined ] ],
         [ [ null, null ] ],
         { 'w.0.0': 'undefined', 'w.0.1': 'undefined' },
@@ -305,7 +305,7 @@ describe('predefined types', () => {
         testSerializeDeserialize(input, wrap(expected, { w: 'URL' }));
     });
 
-    // TODO
+    // TODO Error
     // test.each([
     //     [ new Error('error message'), 'error message' ],
     // ])('Error %p to %p', (input, expected) => {

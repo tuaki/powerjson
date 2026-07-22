@@ -6,7 +6,7 @@ export function mixedExtendedTypesScenario(): Scenario {
         id: 'mixed-extended-types',
         name: 'Mixed Extended Types',
         description: 'A payload that mixes Map, Set, Date, URL, undefined values, numeric edge cases, and object-valued maps.',
-        jsonCompatible: false,
+        skipSerializers: [ 'JSON' ],
         iterations: 1000,
         getData: createMixedExtendedTypes,
     };

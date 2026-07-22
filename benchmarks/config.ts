@@ -1,5 +1,7 @@
-export const DISPLAY_ERRORS = false;
+export const DISPLAY_ERROR_STACKS = false;
+// export const DISPLAY_ERROR_STACKS = true;
 export const DISPLAY_VERBOSE_RESULTS = false;
+// export const DISPLAY_VERBOSE_RESULTS = true;
 
 export const BENCHMARK_SEED = 80085;
 export const REFERENCE_DATE = new Date('2025-01-01T12:00:00.000Z');

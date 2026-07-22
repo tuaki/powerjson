@@ -13,9 +13,9 @@ describe('circular references', () => {
             a: {
                 name: 'a',
                 b: {
-                    $: { a: [ 'ref', 'a' ] },
+                    $: { a: 'ref' },
                     name: 'b',
-                    a: null,
+                    a: 'a',
                 },
             },
         });
@@ -25,9 +25,9 @@ describe('circular references', () => {
         testSerializeDeserialize(a, {
             name: 'a',
             b: {
-                $: { a: [ 'ref', '' ] },
+                $: { a: 'ref' },
                 name: 'b',
-                a: null,
+                a: '',
             },
         });
     });
@@ -38,18 +38,18 @@ describe('circular references', () => {
     test('1 object, nested', () => {
         testSerializeDeserialize({ c }, {
             c: {
-                $: { self: [ 'ref', 'c' ] },
+                $: { self: 'ref' },
                 name: 'c',
-                self: null,
+                self: 'c',
             },
         });
     });
 
     test('1 object, root', () => {
         testSerializeDeserialize(c, {
-            $: { self: [ 'ref', '' ] },
+            $: { self: 'ref' },
             name: 'c',
-            self: null,
+            self: '',
         });
     });
 
@@ -60,16 +60,16 @@ describe('circular references', () => {
             name: 'root',
             childA: {
                 b: {
-                    $: { a: [ 'ref', 'childA' ] },
-                    a: null,
+                    $: { a: 'ref' },
+                    a: 'childA',
                     name: 'b',
                 },
                 name: 'a',
             },
             childB: {
                 a: {
-                    $: { b: [ 'ref', 'childA.b' ] },
-                    b: null,
+                    $: { b: 'ref' },
+                    b: 'childA.b',
                     name: 'a',
                 },
                 name: 'b',
@@ -104,10 +104,10 @@ describe('circular references', () => {
         x.push(y);
 
         testSerializeDeserialize({ x }, {
-            $: { 'x.1.1': [ 'ref', 'x' ] },
+            $: { 'x.1.1': 'ref' },
             x: [
                 'x',
-                [ 'y', null ],
+                [ 'y', 'x' ],
             ],
         });
     });
@@ -117,10 +117,10 @@ describe('circular references', () => {
         z.push(z);
 
         testSerializeDeserialize({ z }, {
-            $: { 'z.1': [ 'ref', 'z' ] },
+            $: { 'z.1': 'ref' },
             z: [
                 'z',
-                null,
+                'z',
             ],
         });
     });
@@ -130,9 +130,9 @@ describe('circular references', () => {
         s.add(s);
 
         testSerializeDeserialize({ s }, {
-            $: { s: 'Set', 's.0': [ 'ref', 's' ] },
+            $: { s: 'Set', 's.0': 'ref' },
             s: [
-                null,
+                's',
             ],
         });
     });
@@ -142,9 +142,9 @@ describe('circular references', () => {
         m.set(m, m);
 
         testSerializeDeserialize({ m }, {
-            $: { m: 'Map', 'm.0.0': [ 'ref', 'm' ], 'm.0.1': [ 'ref', 'm' ] },
+            $: { m: 'Map', 'm.0.0': 'ref', 'm.0.1': 'ref' },
             m: [
-                [ null, null ],
+                [ 'm', 'm' ],
             ],
         });
     });

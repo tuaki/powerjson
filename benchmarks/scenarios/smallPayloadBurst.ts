@@ -1,13 +1,11 @@
 import { faker } from '@faker-js/faker';
 import { type Scenario } from '../measure.js';
 
-// TODO Implement repeated small-payload throughput benchmarking on data.smallPayloadBurst.
 export function smallPayloadBurstScenario(): Scenario {
     return {
         id: 'small-payload-burst',
         name: 'Small Payload Burst',
         description: 'Many small realistic event payloads, measured as repeated per-item serialization and parsing.',
-        jsonCompatible: true,
         iterations: 100,
         getData: createSmallPayloadBursts,
     };

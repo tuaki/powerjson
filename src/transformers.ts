@@ -1,6 +1,40 @@
-import type { Annotation, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
+import type { JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
 import type { Deserializer } from './deserializer.js';
 import type { Serializer } from './serializer.js';
+
+const PLUS_INFINITY = 'Infinity';
+const MINUS_INFINITY = '-Infinity';
+const NAN = 'NaN';
+const NEGATIVE_ZERO = '-0';
+
+export function serializeNumber(value: number): number | string {
+    switch (value) {
+        case Infinity:
+            return PLUS_INFINITY;
+        case -Infinity:
+            return MINUS_INFINITY;
+        case 0:
+            // NICE_TO_HAVE Negative zero can be solved with rawJSON.
+            return (1 / value === -Infinity) ? NEGATIVE_ZERO : 0;
+        default:
+            return Number.isNaN(value) ? NAN : value;
+    }
+}
+
+export function deserializeNumber(value: string): number {
+    switch (value) {
+        case PLUS_INFINITY:
+            return Infinity;
+        case MINUS_INFINITY:
+            return -Infinity;
+        case NAN:
+            return NaN;
+        case NEGATIVE_ZERO:
+            return -0;
+        default:
+            throw new Error(`Invalid number value: ${value}`);
+    }
+}
 
 export type Primitive = undefined | null | string | number | boolean | bigint | symbol;
 
@@ -32,7 +66,7 @@ export type Transformer<TObject extends ObjectLike = ObjectLike> = {
     /**
      * Deserializes the value from a JSON value and an annotation.
      */
-    deserialize(value: JsonValue, annotation: Annotation, deserializer: Deserializer): TObject;
+    deserialize(value: JsonValue, deserializer: Deserializer): TObject;
 };
 
 function transformer<TObject extends ObjectLike, TJson extends JsonValue>(
@@ -40,7 +74,7 @@ function transformer<TObject extends ObjectLike, TJson extends JsonValue>(
     annotation: string | undefined,
     isReferenceType: boolean,
     serialize: (value: TObject, serializer: Serializer) => TJson | undefined,
-    deserialize: (value: TJson, annotation: Annotation, deserializer: Deserializer) => TObject,
+    deserialize: (value: TJson, deserializer: Deserializer) => TObject,
 ): Transformer<TObject> {
     return {
         type,
@@ -65,7 +99,7 @@ const plainObjectTransformer = transformer(
     undefined,
     true,
     (value: Record<string, unknown>, serializer: Serializer) => serializer.serializePlainObject(value),
-    (value: JsonObject, _: Annotation, deserializer: Deserializer) => deserializer.deserializePlainObject(value),
+    (value: JsonObject, deserializer: Deserializer) => deserializer.deserializePlainObject(value),
 );
 
 /**
@@ -82,7 +116,7 @@ const arrayTransformer = transformer(
     undefined,
     true,
     (value: unknown[], serializer: Serializer) => serializer.serializeArray(value),
-    (value: JsonArray, _: Annotation, deserializer: Deserializer) => deserializer.deserializeArray(value),
+    (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeArray(value),
 );
 
 const setTransformer = transformer(
@@ -90,7 +124,7 @@ const setTransformer = transformer(
     'Set',
     true,
     (value: Set<unknown>, serializer: Serializer) => serializer.serializeSet(value),
-    (value: JsonArray, _: Annotation, deserializer: Deserializer) => deserializer.deserializeSet(value),
+    (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeSet(value),
 );
 
 const mapTransformer = transformer(
@@ -98,7 +132,7 @@ const mapTransformer = transformer(
     'Map',
     true,
     (value: Map<unknown, unknown>, serializer: Serializer) => serializer.serializeMap(value),
-    (value: JsonMap, _: Annotation, deserializer: Deserializer) => deserializer.deserializeMap(value),
+    (value: JsonMap, deserializer: Deserializer) => deserializer.deserializeMap(value),
 );
 
 // #endregion

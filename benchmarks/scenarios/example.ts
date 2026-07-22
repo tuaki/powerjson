@@ -6,7 +6,6 @@ export function exampleScenario(): Scenario {
         id: 'example',
         name: 'Example',
         description: 'A compact JSON-compatible payload used only to quickly validate that the benchmark harness works.',
-        jsonCompatible: true,
         iterations: 10,
         getData: createRealisticApiCall,
     };

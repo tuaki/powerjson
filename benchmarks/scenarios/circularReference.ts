@@ -5,7 +5,7 @@ export function circularReferenceScenario(): Scenario {
         id: 'circular-reference',
         name: 'Circular Reference',
         description: 'A cyclic object graph with arrays, sets, and maps referencing each other.',
-        jsonCompatible: false,
+        skipSerializers: [ 'JSON', 'uberjson', 'superjson' ],
         iterations: 100,
         getData: createCircularReference,
     };

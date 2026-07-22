@@ -1,7 +1,6 @@
-import type { AnnotatedJsonObject, Annotation, Annotations, EscapedProperty, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
+import { BIGINT_ANNOTATION, ESCAPE_KEY, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotation, type Annotations, type EscapedProperty, type JsonArray, type JsonMap, type JsonObject, type JsonValue } from './json.js';
 import { stringifyPath, type Path, type StringifiedPath } from './path.js';
-import { Serializer } from './serializer.js';
-import { validateObjectKey, type ObjectLike, type Primitive } from './transformers.js';
+import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.js';
 import type { UberJson } from './uberJson.js';
 
 export class Deserializer {
@@ -9,18 +8,24 @@ export class Deserializer {
         readonly uberJson: UberJson,
     ) {}
 
-    deserialize(value: AnnotatedJsonObject<typeof Serializer.ESCAPE_KEY>) {
-        const isWrapped = value[Serializer.ESCAPE_KEY]?.[Serializer.ESCAPE_KEY] === Serializer.WRAPPED_DIRECTIVE;
+    deserialize(value: AnnotatedJsonObject) {
+        const isWrapped = value[ESCAPE_KEY]?.[ESCAPE_KEY] === WRAPPED_DIRECTIVE;
 
         const deserialized = this.deserializePlainObject(value);
 
-        return isWrapped ? deserialized[Serializer.WRAPPED_KEY] : deserialized;
+        return isWrapped ? deserialized[WRAPPED_KEY] : deserialized;
     }
 
     private readonly rootToParent: Path = [];
     private parentToValue: Path = [];
 
-    annotations: Annotations<typeof Serializer.ESCAPE_KEY> | undefined;
+    // TODO `stringifyPath` is slow. Two fixes:
+    // - don't proactively create reference for each object.
+    // - iterate over annotations, not over values.
+    //    - not possible, we have to explore all objects
+    //    - however, we can put something like 'stop' annotation to objects / arrays that should not be explored further (during serialization).
+
+    annotations: Annotations | undefined;
 
     private getAnnotation(): Annotation | undefined {
         if (!this.annotations)
@@ -28,14 +33,14 @@ export class Deserializer {
 
         const key = stringifyPath(this.parentToValue);
 
-        if (key === Serializer.ESCAPE_KEY)
+        if (key === ESCAPE_KEY)
             return this.getEscapedProperty()?.annotation;
         else
             return this.annotations[key];
     }
 
     private getEscapedProperty(): EscapedProperty | undefined {
-        return this.annotations?.[Serializer.ESCAPE_KEY] as EscapedProperty | undefined;
+        return this.annotations?.[ESCAPE_KEY] as EscapedProperty | undefined;
     }
 
     private readonly allReferences = new Map<StringifiedPath, ObjectLike>();
@@ -44,18 +49,10 @@ export class Deserializer {
         this.allReferences.set(stringifyPath([ ...this.rootToParent, ...this.parentToValue ]), value);
     }
 
-    private deserializeReference(annotation: Annotation): ObjectLike {
-        if (!Array.isArray(annotation) || annotation.length !== 2)
-            throw new Error(`Invalid reference annotation: ${annotation}`);
-
-        const reference = annotation[1];
-
+    private deserializeReference(reference: string): ObjectLike {
         // We expect the json to be deserialized in the same order as it was serialized. I.e., when we encounter a reference, it should have already been deserialized and stored in the referenceIdentities map.
         // If this is not true, things will get whole lot more complicated. Basically, set/map objects can have references as keys (or values). We want to preserve the order of the keys (because JS does preserve it), so we need to put the keys there in the same order as they were serialized (they are serialized as arrays, so the order is preserved in JSON).
         // Therefore, we would have to probably first construct all objects to fill the reference map and only after then start filling in the values.
-
-        if (typeof reference !== 'string')
-            throw new Error(`Invalid reference: ${reference}`);
 
         const referencedValue = this.allReferences.get(reference);
         if (!referencedValue)
@@ -74,22 +71,23 @@ export class Deserializer {
 
     // #region Containers
 
-    // TODO fix annotation types?
     deserializePlainObject(value: JsonObject): Record<string, unknown> {
         const output = {} as Record<string, unknown>;
         this.setReference(output);
 
         const prevAnnotations = this.annotations;
-        this.annotations = value[Serializer.ESCAPE_KEY] as Annotations<typeof Serializer.ESCAPE_KEY> | undefined;
+        this.annotations = value[ESCAPE_KEY] as Annotations | undefined;
 
         const prevPathFromParent = this.parentToValue;
         this.rootToParent.push(...prevPathFromParent);
         this.parentToValue = [];
 
+        // End context
+
         for (const [ key, item ] of Object.entries(value)) {
             validateObjectKey(key);
 
-            if (key === Serializer.ESCAPE_KEY)
+            if (key === ESCAPE_KEY)
                 continue;
 
             output[key] = this.deserializeChild(item, key);
@@ -97,7 +95,9 @@ export class Deserializer {
 
         const escapedProperty = this.getEscapedProperty();
         if (escapedProperty)
-            output[Serializer.ESCAPE_KEY] = this.deserializeChild(escapedProperty.value!, Serializer.ESCAPE_KEY);
+            output[ESCAPE_KEY] = this.deserializeChild(escapedProperty.value!, ESCAPE_KEY);
+
+        // Start context
 
         this.annotations = prevAnnotations;
 
@@ -163,41 +163,24 @@ export class Deserializer {
     }
 
     private deserializeAnnotatedValue(value: JsonValue, annotation: Annotation): ObjectLike | Primitive {
-        const typeName = typeof annotation === 'string' ? annotation : annotation[0];
-
-        switch (typeName) {
-            case Serializer.REFERENCE_ANNOTATION:
-                return this.deserializeReference(annotation);
-            case Serializer.UNDEFINED_ANNOTATION:
+        switch (annotation) {
+            case REFERENCE_ANNOTATION:
+                return this.deserializeReference(value as string);
+            case UNDEFINED_ANNOTATION:
                 return undefined;
-            case Serializer.NUMBER_ANNOTATION:
-                return this.deserializeNumber(value as string);
-            case Serializer.BIGINT_ANNOTATION:
+            case NUMBER_ANNOTATION:
+                return deserializeNumber(value as string);
+            case BIGINT_ANNOTATION:
                 return BigInt(value as string);
             default: {
-                const transformer = this.uberJson.getTransformerForAnnotation(typeName);
-                const output = transformer.deserialize(value, annotation, this);
+                const transformer = this.uberJson.getTransformerForAnnotation(annotation);
+                const output = transformer.deserialize(value, this);
 
                 if (transformer.isReferenceType)
                     this.setReference(output);
 
                 return output;
             }
-        }
-    }
-
-    private deserializeNumber(value: string): number {
-        switch (value) {
-            case Serializer.PLUS_INFINITY:
-                return Infinity;
-            case Serializer.MINUS_INFINITY:
-                return -Infinity;
-            case Serializer.NAN:
-                return NaN;
-            case Serializer.NEGATIVE_ZERO:
-                return -0;
-            default:
-                throw new Error(`Invalid number value: ${value}`);
         }
     }
 }

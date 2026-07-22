@@ -6,7 +6,6 @@ export function repeatedTemporalValuesScenario(): Scenario {
         id: 'repeated-temporal-values',
         name: 'Repeated Temporal Values',
         description: 'A realistic workload with many repeated Date and URL instances shared across entries.',
-        jsonCompatible: false,
         iterations: 100,
         getData: createRepeatedTemporalValues,
     };

@@ -6,7 +6,6 @@ export function sharedReferenceScenario(): Scenario {
         id: 'shared-reference',
         name: 'Shared Reference',
         description: 'A JSON-compatible graph with many repeated object and array references but no cycles.',
-        jsonCompatible: true,
         iterations: 200,
         getData: createSharedReferenceGraph,
     };
