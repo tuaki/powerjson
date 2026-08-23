@@ -77,7 +77,7 @@ describe('circular references', () => {
         };
 
         const serialized = UberJson.serialize(input);
-        expect(serialized).toEqual(expectedSerialized);
+        expect(serialized).toStrictEqual(expectedSerialized);
 
         const parsed = JSON.parse(JSON.stringify(serialized));
         expect(() => UberJson.deserialize(parsed)).not.toThrow();
@@ -93,7 +93,7 @@ describe('circular references', () => {
         const parsed = JSON.parse(JSON.stringify(serialized));
 
         const deserialized = uberJson.deserialize(parsed);
-        expect(deserialized).toEqual(input);
+        expect(deserialized).toStrictEqual(input);
 
         testReferences(input, deserialized);
     });
@@ -173,16 +173,16 @@ describe('reference objects', () => {
 
         const output = uberJson.deserialize(uberJson.serialize(input)) as typeof input;
 
-        expect(output).toEqual(input);
+        expect(output).toStrictEqual(input);
         // The string properties should be omitted during serialization.
-        expect(Object.keys(objectAccess)).toEqual([ '0', 'a', 'value', 'b' ]);
-        expect(Object.keys(output.array)).toEqual([ '0' ]);
+        expect(Object.keys(objectAccess)).toStrictEqual([ '0', 'a', 'value', 'b' ]);
+        expect(Object.keys(output.array)).toStrictEqual([ '0' ]);
 
         // This is an error in superJson.
         const incorrect = superJson.deserialize(superJson.serialize(input)) as typeof input;
-        expect(incorrect).toEqual(input);
+        expect(incorrect).toStrictEqual(input);
         // Reference objects are omitted from the actualy array, but are preserved as references and added back as `NaN`.
-        expect(Object.keys(incorrect.array)).toEqual([ '0', 'NaN' ]);
+        expect(Object.keys(incorrect.array)).toStrictEqual([ '0', 'NaN' ]);
     });
 
     test('reference keys in maps are handled correctly', () => {
@@ -194,13 +194,13 @@ describe('reference objects', () => {
 
         const output = uberJson.deserialize(uberJson.serialize(input)) as typeof input;
         // No testing for equality as the comparer doesn't handle references as keys.
-        expect([ ...output.map.values() ]).toEqual([ 'a', 'b' ]);
+        expect([ ...output.map.values() ]).toStrictEqual([ 'a', 'b' ]);
 
         // This is an error in superJson.
         const incorrect = superJson.deserialize(superJson.serialize(input)) as typeof input;
         // During deserialization, superJson first transforms maps into Map objects and only after that applies deduplication.
         // However, if multiple references are used as map keys, all of them are serialized as `null`. When the map is created, all nulls are mapped to the same key. Deduplication after that won't fix this.
-        expect([ ...incorrect.map.values() ]).toEqual([ 'b', undefined ]);
+        expect([ ...incorrect.map.values() ]).toStrictEqual([ 'b', undefined ]);
     });
 });
 
@@ -225,7 +225,7 @@ describe('deduplication', () => {
 
         const output = uberJson.parse(uberJson.stringify(input));
 
-        expect(output).toEqual(input);
+        expect(output).toStrictEqual(input);
         testReferences(input, output);
     });
 
@@ -248,7 +248,7 @@ describe('deduplication', () => {
 
         const output = uberJson.parse(uberJson.stringify(input));
 
-        expect(output).toEqual(input);
+        expect(output).toStrictEqual(input);
         testReferences(input, output);
     });
 
@@ -268,7 +268,7 @@ describe('deduplication', () => {
 
         const output = uberJson.parse(uberJson.stringify(input));
 
-        expect(output).toEqual(input);
+        expect(output).toStrictEqual(input);
         testReferences(input, output);
     });
 
@@ -296,7 +296,7 @@ describe('deduplication', () => {
             wrapper: wrapperB,
         };
 
-        expect(a).toEqual(b);
+        expect(a).toStrictEqual(b);
         expect(() => testReferences(a, b, [ ...nonReferenceTypes, Wrapper ])).toThrow();
     });
 });

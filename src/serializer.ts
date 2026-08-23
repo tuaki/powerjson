@@ -1,15 +1,15 @@
-import { BIGINT_ANNOTATION, ESCAPE_KEY, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotation, type Annotations, type EscapedProperty, type JsonArray, type JsonMap, type JsonObject, type JsonValue } from './json.js';
+import { BIGINT_ANNOTATION, ESCAPE_KEY, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotation, type Annotations, type EscapedProperty, type JsonArray, type JsonMap, type JsonValue } from './json.js';
 import { stringifyPath, type Path, type StringifiedPath } from './path.js';
-import { serializeNumber, validateObjectKey, type ObjectLike } from './transformers.js';
+import { serializeNumber, validateObjectKey, type ISerializer, type ObjectLike } from './transformers.js';
 import type { UberJson } from './uberJson.js';
 import { ensureProperty } from './utils.js';
 
-export class Serializer {
+export class Serializer implements ISerializer {
     constructor(
         readonly uberJson: UberJson,
     ) {}
 
-    serialize(value: unknown): JsonObject {
+    serialize(value: unknown): AnnotatedJsonObject {
         // If the top-level value isn't a plain object, we have to wrap it so that it can put its annotations somewhere.
         const isWrapped = !isPlainObject(value);
 

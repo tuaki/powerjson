@@ -70,6 +70,7 @@ export default defineConfig([
                 },
             } ],
             '@stylistic/space-infix-ops': [ 'warn' ],
+            '@stylistic/keyword-spacing': [ 'warn' ],
 
             // TypeScript
             '@typescript-eslint/no-unused-vars': [ 'error', {} ],

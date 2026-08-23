@@ -8,7 +8,7 @@ describe('parsePath', () => {
         [ 'test\\\\.a.b', [ 'test\\', 'a', 'b' ] ],
         [ 'test\\\\a.b', [ 'test\\a', 'b' ] ],
     ])('parsePath(%s) === %p', (input, expectedOutput) => {
-        expect(parsePath(input)).toEqual(expectedOutput);
+        expect(parsePath(input)).toStrictEqual(expectedOutput);
     });
 
     test.each([
@@ -24,6 +24,6 @@ describe('escapeKey', () => {
         [ 'dontescape', 'dontescape' ],
         [ 'escape.me', 'escape\\.me' ],
     ])('escapeKey(%s) === %s', (input, expectedOutput) => {
-        expect(escapeKey(input)).toEqual(expectedOutput);
+        expect(escapeKey(input)).toStrictEqual(expectedOutput);
     });
 });

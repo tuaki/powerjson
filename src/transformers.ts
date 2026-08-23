@@ -1,6 +1,4 @@
-import type { JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
-import type { Deserializer } from './deserializer.js';
-import type { Serializer } from './serializer.js';
+import type { AnnotatedJsonObject, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
 
 const PLUS_INFINITY = 'Infinity';
 const MINUS_INFINITY = '-Infinity';
@@ -49,6 +47,24 @@ export type Constructor<T = unknown> = {
     new (...args: any[]): T;
 };
 
+export type ISerializer = {
+    serialize(value: unknown): AnnotatedJsonObject;
+
+    serializePlainObject(value: Record<string, unknown>): AnnotatedJsonObject;
+    serializeArray(value: unknown[]): JsonArray;
+    serializeSet(value: Set<unknown>): JsonArray;
+    serializeMap(value: Map<unknown, unknown>): JsonMap;
+};
+
+export type IDeserializer = {
+    deserialize(value: AnnotatedJsonObject): unknown;
+
+    deserializePlainObject(value: JsonObject): Record<string, unknown>;
+    deserializeArray(value: JsonArray): unknown[];
+    deserializeSet(value: JsonArray): Set<unknown>;
+    deserializeMap(value: JsonMap): Map<unknown, unknown>;
+};
+
 export type Transformer<TObject extends ObjectLike = ObjectLike> = {
     // TODO Use the type or its prototype?
     type: Constructor<TObject>;
@@ -62,19 +78,19 @@ export type Transformer<TObject extends ObjectLike = ObjectLike> = {
      * If undefined is returned, the value will be skipped from objects, sets, and maps. However, it will be kept in arrays as `null` to preserve indexes.
      * Try `JSON.stringify({ a: undefined })` and `JSON.stringify([ undefined ])` to see the difference.
      */
-    serialize(value: TObject, serializer: Serializer): JsonValue | undefined;
+    serialize(value: TObject, serializer: ISerializer): JsonValue | undefined;
     /**
      * Deserializes the value from a JSON value and an annotation.
      */
-    deserialize(value: JsonValue, deserializer: Deserializer): TObject;
+    deserialize(value: JsonValue, deserializer: IDeserializer): TObject;
 };
 
 function transformer<TObject extends ObjectLike, TJson extends JsonValue>(
     type: Constructor<TObject>,
     annotation: string | undefined,
     isReferenceType: boolean,
-    serialize: (value: TObject, serializer: Serializer) => TJson | undefined,
-    deserialize: (value: TJson, deserializer: Deserializer) => TObject,
+    serialize: (value: TObject, serializer: ISerializer) => TJson | undefined,
+    deserialize: (value: TJson, deserializer: IDeserializer) => TObject,
 ): Transformer<TObject> {
     return {
         type,
@@ -98,8 +114,8 @@ const plainObjectTransformer = transformer(
     Object as unknown as Constructor<Record<string, unknown>>,
     undefined,
     true,
-    (value: Record<string, unknown>, serializer: Serializer) => serializer.serializePlainObject(value),
-    (value: JsonObject, deserializer: Deserializer) => deserializer.deserializePlainObject(value),
+    (value: Record<string, unknown>, serializer: ISerializer) => serializer.serializePlainObject(value),
+    (value: JsonObject, deserializer: IDeserializer) => deserializer.deserializePlainObject(value),
 );
 
 /**
@@ -115,24 +131,24 @@ const arrayTransformer = transformer(
     Array,
     undefined,
     true,
-    (value: unknown[], serializer: Serializer) => serializer.serializeArray(value),
-    (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeArray(value),
+    (value: unknown[], serializer: ISerializer) => serializer.serializeArray(value),
+    (value: JsonArray, deserializer: IDeserializer) => deserializer.deserializeArray(value),
 );
 
 const setTransformer = transformer(
     Set,
     'Set',
     true,
-    (value: Set<unknown>, serializer: Serializer) => serializer.serializeSet(value),
-    (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeSet(value),
+    (value: Set<unknown>, serializer: ISerializer) => serializer.serializeSet(value),
+    (value: JsonArray, deserializer: IDeserializer) => deserializer.deserializeSet(value),
 );
 
 const mapTransformer = transformer(
     Map,
     'Map',
     true,
-    (value: Map<unknown, unknown>, serializer: Serializer) => serializer.serializeMap(value),
-    (value: JsonMap, deserializer: Deserializer) => deserializer.deserializeMap(value),
+    (value: Map<unknown, unknown>, serializer: ISerializer) => serializer.serializeMap(value),
+    (value: JsonMap, deserializer: IDeserializer) => deserializer.deserializeMap(value),
 );
 
 // #endregion

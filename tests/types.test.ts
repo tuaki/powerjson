@@ -194,7 +194,7 @@ describe('special objects', () => {
     test('annotation is the first key', () => {
         const input = { a: 1, b: NaN };
         const output = UberJson.serialize(input);
-        expect(Object.keys(output)).toEqual([ '$', 'a', 'b' ]);
+        expect(Object.keys(output)).toStrictEqual([ '$', 'a', 'b' ]);
     });
 
     test('object with null prototype', () => {
@@ -264,7 +264,7 @@ describe('predefined types', () => {
     test.each([
         [ new Date('2000-01-01T00:00:00.000Z'), '2000-01-01T00:00:00.000Z' ],
         [ new Date('1234-12-12T12:34:56.789Z'), '1234-12-12T12:34:56.789Z' ],
-        // TODO toEqual returns false for two invalid dates (even though it returns true for two NaNs).
+        // TODO toStrictEqual returns false for two invalid dates (even though it returns true for two NaNs).
         // see https://github.com/oven-sh/bun/issues/34816
         // Once it's fixed, unify this test with the one below.
         // [ new Date(NaN), null ],
@@ -277,7 +277,7 @@ describe('predefined types', () => {
     });
 
     test('Invalid date', () => {
-        expect(UberJson.serialize({ input: new Date(NaN) })).toEqual({
+        expect(UberJson.serialize({ input: new Date(NaN) })).toStrictEqual({
             $: { input: 'Date' },
             input: null,
         });

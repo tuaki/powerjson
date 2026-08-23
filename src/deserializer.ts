@@ -1,14 +1,14 @@
 import { BIGINT_ANNOTATION, ESCAPE_KEY, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotation, type Annotations, type EscapedProperty, type JsonArray, type JsonMap, type JsonObject, type JsonValue } from './json.js';
 import { stringifyPath, type Path, type StringifiedPath } from './path.js';
-import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.js';
+import { deserializeNumber, validateObjectKey, type IDeserializer, type ObjectLike, type Primitive } from './transformers.js';
 import type { UberJson } from './uberJson.js';
 
-export class Deserializer {
+export class Deserializer implements IDeserializer {
     constructor(
         readonly uberJson: UberJson,
     ) {}
 
-    deserialize(value: AnnotatedJsonObject) {
+    deserialize(value: AnnotatedJsonObject): unknown {
         const isWrapped = value[ESCAPE_KEY]?.[ESCAPE_KEY] === WRAPPED_DIRECTIVE;
 
         const deserialized = this.deserializePlainObject(value);
