@@ -73,6 +73,10 @@ export type Transformer<TObject extends ObjectLike = ObjectLike> = {
 type Clazz<T> = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- This is needed for `new` operator. Nothing else really works.
     new (...args: any[]): T;
+} | {
+    // This should be enough to allow classes with private constructors. The best we can do is hope.
+    prototype: T;
+    name: string;
 };
 
 export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config: {

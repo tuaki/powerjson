@@ -24,8 +24,6 @@ export class SimpleDeserializer extends Deserializer {
         this.pathEntities.pop();
     }
 
-    // #endregion
-
     protected override getReference(entityId: EntityId) {
         // A reference is just an index from the output root.
         const entity = this.pathEntities[entityId];
@@ -34,4 +32,6 @@ export class SimpleDeserializer extends Deserializer {
 
         return entity;
     }
+
+    // #endregion
 }

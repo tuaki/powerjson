@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        /* Monorepo setup */
+        // Monorepo setup
         "composite": true,
         "declaration": true,
         "declarationMap": true,
@@ -8,7 +8,7 @@
         "noEmitOnError": true,
         "skipLibCheck": true,
 
-        /* ESM */
+        // ESM
         "esModuleInterop": true,
         "isolatedModules": true,
         "moduleResolution": "nodenext",
@@ -16,7 +16,7 @@
         "target": "ESNext",
         "moduleDetection": "force",
 
-        /* Linting */
+        // Linting
         "strict": true,
         "noFallthroughCasesInSwitch": true,
         "noUnusedLocals": true,
@@ -29,7 +29,7 @@
 
         "outDir": "./dist",
 
-        /* Features */
+        // Features
         "lib": [
             "ESNext",
         ],

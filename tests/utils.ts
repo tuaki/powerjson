@@ -1,6 +1,7 @@
 import { expect } from 'bun:test';
 import type { UberJson } from '../src/uberJson.js';
 import type { JsonObject, JsonValue } from '../src/json.js';
+import type { Transformer } from '../src/transformers.js';
 
 export function wrap(value: JsonValue, annotations?: Record<string, unknown>): JsonObject {
     return {
@@ -43,6 +44,11 @@ export class Tester {
         for (const serializer of this.serializers)
             callback(serializer);
     }
+
+    registerTransformer(transformer: Transformer) {
+        for (const serializer of this.serializers)
+            serializer.registerTransformer(transformer);
+    }
 }
 
 export function testSerializeDeserialize(serializer: UberJson, input: unknown, expectedSerialized?: JsonObject, reverseJsonOrder = false) {
@@ -56,8 +62,7 @@ export function testSerializeDeserialize(serializer: UberJson, input: unknown, e
     if (reverseJsonOrder)
         serialized = reverseObjectKeys(serialized);
 
-    const stringified = JSON.stringify(serialized);
-    const parsed = JSON.parse(stringified);
+    const parsed = JSON.parse(JSON.stringify(serialized));
 
     // Again, no changes during deserialization.
     deepFreeze(parsed);

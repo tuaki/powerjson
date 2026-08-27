@@ -204,7 +204,7 @@ export abstract class Serializer {
     // #endregion
     // #region Transformers
 
-    /** Returns `undefined` if the value should be skipped. Doesn't work everywhere, though (e.g., in arrays). */
+    /** Returns `undefined` if the value should be skipped. This doesn't work everywhere, though (e.g., in arrays). */
     private serializeUnknown(value: unknown): JsonValue | undefined {
         switch (typeof value) {
             case 'string':
