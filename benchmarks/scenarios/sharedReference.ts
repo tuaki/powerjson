@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { type Scenario } from '../measure.js';
+import type { Scenario } from '../measure.js';
 
 export function sharedReferenceScenario(): Scenario {
     return {
@@ -7,6 +7,7 @@ export function sharedReferenceScenario(): Scenario {
         name: 'Shared Reference',
         description: 'A JSON-compatible graph with many repeated object and array references but no cycles.',
         iterations: 200,
+        batches: 10,
         getData: createSharedReferenceGraph,
     };
 }

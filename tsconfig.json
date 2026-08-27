@@ -24,6 +24,8 @@
         "forceConsistentCasingInFileNames": true,
 
         "verbatimModuleSyntax": true,
+        // Make this library as compatible as possible.
+        "erasableSyntaxOnly": true,
 
         "outDir": "./dist",
 

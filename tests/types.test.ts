@@ -1,7 +1,12 @@
 import { expect, test, describe } from 'bun:test';
 import { UberJson } from '../src/uberJson.js';
 import type { Annotations, JsonArray, JsonMap } from '../src/json.js';
-import { testSerializeDeserialize, wrap } from './utils.js';
+import { Tester, wrap } from './utils.js';
+
+const tester = new Tester([
+    new UberJson({ deduplicate: false }),
+    new UberJson({ deduplicate: true }),
+]);
 
 describe('primitive types', () => {
     test.each([
@@ -13,16 +18,16 @@ describe('primitive types', () => {
         true,
         null,
     ])('primitive %p', input => {
-        testSerializeDeserialize({ input }, { input });
-        testSerializeDeserialize(input, wrap(input));
+        tester.serializeDeserialize({ input }, { input });
+        tester.serializeDeserialize(input, wrap(input));
     });
 
     test('undefined', () => {
-        testSerializeDeserialize({ input: undefined }, {
+        tester.serializeDeserialize({ input: undefined }, {
             $: { input: 'undefined' },
             input: null,
         });
-        testSerializeDeserialize(undefined, wrap(null, { w: 'undefined' }));
+        tester.serializeDeserialize(undefined, wrap(null, { w: 'undefined' }));
     });
 
     test.each([
@@ -31,11 +36,11 @@ describe('primitive types', () => {
         [ -Infinity, '-Infinity' ],
         [ -0, '-0' ],
     ])('number %p to "%s"', (input, expected) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: { input: 'number' },
             input: expected,
         });
-        testSerializeDeserialize(input, wrap(expected, { w: 'number' }));
+        tester.serializeDeserialize(input, wrap(expected, { w: 'number' }));
     });
 
     test.each([
@@ -44,11 +49,11 @@ describe('primitive types', () => {
         [ 1234567890123456789012345678901234567890n, '1234567890123456789012345678901234567890' ],
         [ BigInt(Number.MAX_SAFE_INTEGER) + 2n, String(BigInt(Number.MAX_SAFE_INTEGER) + 2n) ],
     ])('bigint %p to "%s"', (input, expected) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: { input: 'bigint' },
             input: expected,
         });
-        testSerializeDeserialize(input, wrap(expected, { w: 'bigint' }));
+        tester.serializeDeserialize(input, wrap(expected, { w: 'bigint' }));
     });
 });
 
@@ -59,10 +64,10 @@ describe('containers', () => {
         [ { 0: 1, 2: 3 }, { 0: 1, 2: 3 } ],
         [ { a: undefined }, { a: null, $: { a: 'undefined' } } ],
         [ { 'a.b': 1, 'c\\d': 2 }, { 'a.b': 1, 'c\\d': 2 } ],
-        [ { 'a.b': NaN, 'c\\d': NaN }, { 'a.b': 'NaN', 'c\\d': 'NaN', $: { 'a\\.b': 'number', 'c\\\\d': 'number' } } ],
+        [ { 'a.b': NaN, 'c\\d': NaN }, { 'a.b': 'NaN', 'c\\d': 'NaN', $: { 'a.b': 'number', 'c\\d': 'number' } } ],
     ])('object %p', (input, expected) => {
-        testSerializeDeserialize({ input }, { input: expected });
-        testSerializeDeserialize(input, expected);
+        tester.serializeDeserialize({ input }, { input: expected });
+        tester.serializeDeserialize(input, expected);
     });
 
     test.each([
@@ -72,20 +77,20 @@ describe('containers', () => {
         [ [ [] ] ],
         [ [ [ 1 ], [ 2 ] ] ],
     ])('array %p', (input: JsonArray) => {
-        testSerializeDeserialize({ input }, { input });
-        testSerializeDeserialize(input, wrap(input));
+        tester.serializeDeserialize({ input }, { input });
+        tester.serializeDeserialize(input, wrap(input));
     });
 
     test.each([ [
         [ undefined ],
         [ null ],
-        { 'input.0': 'undefined' },
+        { input: { 1: 'undefined' } },
     ], [
         [ 1, [ [ undefined ], 2 ] ],
         [ 1, [ [ null ], 2 ] ],
-        { 'input.1.0.0': 'undefined' },
+        { input: { 4: 'undefined' } },
     ] ])('array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: annotations,
             input: expected,
         });
@@ -94,13 +99,13 @@ describe('containers', () => {
     test.each([ [
         [ undefined ],
         [ null ],
-        { 'w.0': 'undefined' },
+        { w: { 1: 'undefined' } },
     ], [
         [ 1, [ [ undefined ], 2 ] ],
         [ 1, [ [ null ], 2 ] ],
-        { 'w.1.0.0': 'undefined' },
+        { w: { 4: 'undefined' } },
     ] ])('root array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
-        testSerializeDeserialize(input, wrap(expected, annotations));
+        tester.serializeDeserialize(input, wrap(expected, annotations));
     });
 
     test.each([
@@ -110,24 +115,24 @@ describe('containers', () => {
         [ [ [] ] ],
         [ [ [ 1 ], [ 2 ] ] ],
     ])('set %p', (input: JsonArray) => {
-        testSerializeDeserialize({ input: new Set(input) }, {
-            $: { input: 'Set' },
+        tester.serializeDeserialize({ input: new Set(input) }, {
+            $: { input: { 0: 'Set' } },
             input,
         });
-        testSerializeDeserialize(new Set(input), wrap(input, { w: 'Set' }));
+        tester.serializeDeserialize(new Set(input), wrap(input, { w: { 0: 'Set' } }));
     });
 
     test.each([ [
         [ undefined ],
         [ null ],
-        { 'input.0': 'undefined' },
+        { input: { 0: 'Set', 1: 'undefined' } },
     ], [
         [ 1, [ [ undefined ], 2 ] ],
         [ 1, [ [ null ], 2 ] ],
-        { 'input.1.0.0': 'undefined' },
+        { input: { 0: 'Set', 4: 'undefined' } },
     ] ])('set %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
-        testSerializeDeserialize({ input: new Set(input) }, {
-            $: { input: 'Set', ...annotations },
+        tester.serializeDeserialize({ input: new Set(input) }, {
+            $: annotations,
             input: expected,
         });
     });
@@ -138,33 +143,33 @@ describe('containers', () => {
         [ [ [ null, true ], [ 'a', 1 ], [ true, null ] ] ],
         [ [ [ [], {} ], [ {}, [] ] ] ],
     ])('map %p', input => {
-        testSerializeDeserialize({ input: new Map(input) }, {
-            $: { input: 'Map' },
+        tester.serializeDeserialize({ input: new Map(input) }, {
+            $: { input: { 0: 'Map' } },
             input,
         });
-        testSerializeDeserialize(new Map(input), wrap(input, { w: 'Map' }));
+        tester.serializeDeserialize(new Map(input), wrap(input, { w: { 0: 'Map' } }));
     });
 
     test.each<[[unknown, unknown][], JsonMap, Annotations]>([ [
         [ [ undefined, undefined ] ],
         [ [ null, null ] ],
-        { 'input.0.0': 'undefined', 'input.0.1': 'undefined' },
+        { input: { 0: 'Map', 2: 'undefined', 3: 'undefined' } },
     ], [
         [ [ 'key', [ undefined ] ], [ [ undefined ], 'input' ] ],
         [ [ 'key', [ null ] ], [ [ null ], 'input' ] ],
-        { 'input.0.1.0': 'undefined', 'input.1.0.0': 'undefined' },
+        { input: { 0: 'Map', 4: 'undefined', 7: 'undefined' } },
         // TODO This fails right now because of a bug in bun.
         // see https://github.com/oven-sh/bun/issues/34830
         // A copy of a superJson test. It works in both libraries, but differently.
-        // - They treat regexes as references, so their keys are unique.
-        // - We treat regexes as values, however, internally are still references. So, they are still unique keys.
+        // - They treat regexes as entities, so their keys are unique.
+        // - We treat regexes as values, however, internally are still entities. So, they are still unique keys.
         // ], [
         //     [ [ /a/g, 'foo' ], [ /a/g, 'bar' ] ],
         //     [ [ '/a/g', 'foo' ], [ '/a/g', 'bar' ] ],
-        //     { 'input.0.0': 'RegExp', 'input.1.0': 'RegExp' },
+        //     { input: { 0: 'Map', 2: 'RegExp', 5: 'RegExp' } },
     ] ])('map %p to %p', (input, expected, annotations) => {
-        testSerializeDeserialize({ input: new Map(input) }, {
-            $: { input: 'Map', ...annotations },
+        tester.serializeDeserialize({ input: new Map(input) }, {
+            $: annotations,
             input: expected,
         });
     });
@@ -172,55 +177,63 @@ describe('containers', () => {
     test.each<[[unknown, unknown][], JsonMap, Annotations]>([ [
         [ [ undefined, undefined ] ],
         [ [ null, null ] ],
-        { 'w.0.0': 'undefined', 'w.0.1': 'undefined' },
+        { w: { 0: 'Map', 2: 'undefined', 3: 'undefined' } },
     ], [
         [ [ 'key', [ undefined ] ], [ [ undefined ], 'input' ] ],
         [ [ 'key', [ null ] ], [ [ null ], 'input' ] ],
-        { 'w.0.1.0': 'undefined', 'w.1.0.0': 'undefined' },
+        { w: { 0: 'Map', 4: 'undefined', 7: 'undefined' } },
     ] ])('root map %p to %p', (input, expected, annotations) => {
-        testSerializeDeserialize(new Map(input), wrap(expected, { w: 'Map', ...annotations }));
+        tester.serializeDeserialize(new Map(input), wrap(expected, annotations));
     });
 });
 
 describe('special objects', () => {
     test.each([
         [ { $: NaN }, { $: { $: { value: 'NaN', annotation: 'number' } } } ],
-        [ { $: [ NaN ] }, { $: { $: { value: [ 'NaN' ] }, '$.0': 'number' } } ],
+        [ { $: [ NaN ] }, { $: { $: { value: [ 'NaN' ], annotation: { 1: 'number' } } } } ],
     ])('object with escape key %p', (input, expected) => {
-        testSerializeDeserialize({ input }, { input: expected });
-        testSerializeDeserialize(input, expected);
+        tester.serializeDeserialize({ input }, { input: expected });
+        tester.serializeDeserialize(input, expected);
     });
 
     test('annotation is the first key', () => {
         const input = { a: 1, b: NaN };
-        const output = UberJson.serialize(input);
-        expect(Object.keys(output)).toStrictEqual([ '$', 'a', 'b' ]);
+
+        tester.serialize(input, serialized => {
+            expect(Object.keys(serialized)).toStrictEqual([ '$', 'a', 'b' ]);
+        });
     });
 
     test('object with null prototype', () => {
-        const input: Record<string, unknown> = Object.create(null);
-        input.date = new Date('2000-01-01T00:00:00.000Z');
+        tester.forEach(serializer => {
+            const input: Record<string, unknown> = Object.create(null);
+            input.date = new Date('2000-01-01T00:00:00.000Z');
 
-        const output = UberJson.parse<{ date: Date }>(UberJson.stringify(input));
+            const output = serializer.parse<{ date: Date }>(serializer.stringify(input));
 
-        expect(output.date).toBeInstanceOf(Date);
-        expect(output.date.toISOString()).toBe('2000-01-01T00:00:00.000Z');
+            expect(output.date).toBeInstanceOf(Date);
+            expect(output.date.toISOString()).toBe('2000-01-01T00:00:00.000Z');
+        });
     });
 
     const forbiddenObjectKeys = [ '__proto__', 'prototype', 'constructor' ];
 
     test.each(forbiddenObjectKeys)('serialization rejects forbidden key %s', forbiddenKey => {
-        const input: Record<string, unknown> = Object.create(null);
-        input[forbiddenKey] = 1;
+        tester.forEach(serializer => {
+            const input: Record<string, unknown> = Object.create(null);
+            input[forbiddenKey] = 1;
 
-        expect(() => UberJson.serialize(input)).toThrowError(new RegExp(forbiddenKey));
+            expect(() => serializer.serialize(input)).toThrowError(new RegExp(forbiddenKey));
+        });
     });
 
     test.each(forbiddenObjectKeys)('deserialization rejects forbidden key %s', forbiddenKey => {
-        const inputJson = `{ "${forbiddenKey}": 1 }`;
+        tester.forEach(serializer => {
+            const inputJson = `{ "${forbiddenKey}": 1 }`;
 
-        expect(() => UberJson.parse(inputJson)).toThrowError(new RegExp(forbiddenKey));
-        expect((Object.prototype as Record<string, unknown>).value).toBeUndefined();
+            expect(() => serializer.parse(inputJson)).toThrowError(new RegExp(forbiddenKey));
+            expect((Object.prototype as Record<string, unknown>).value).toBeUndefined();
+        });
     });
 });
 
@@ -234,11 +247,11 @@ describe('typed arrays', () => {
         [ new Uint8Array([ 248 ]), '-A==' ], // url-safe base64 encoding
         [ new Uint8Array(new Uint8Array([ 1, 1, 0, 1 ]).buffer, 2, 1), 'AA==' ], // same as [ 0 ]
     ])('Uint8Array %p to %s', (input, expected) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: { input: 'Uint8Array' },
             input: expected,
         });
-        testSerializeDeserialize(input, wrap(expected, { w: 'Uint8Array' }));
+        tester.serializeDeserialize(input, wrap(expected, { w: 'Uint8Array' }));
     });
 
     test.each([
@@ -252,11 +265,11 @@ describe('typed arrays', () => {
         // [ new Float64Array([ NaN, -0, Infinity, -Infinity ]), 'AAAAAAAA-H8AAAAAAAAAgAAAAAAAAPB_AAAAAAAA8P8=' ],
         [ new Float64Array([ Number.MAX_SAFE_INTEGER * 2 ]), '________T0M=' ],
     ])('Float64Array %p to %s', (input, expected) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: { input: 'Float64Array' },
             input: expected,
         });
-        testSerializeDeserialize(input, wrap(expected, { w: 'Float64Array' }));
+        tester.serializeDeserialize(input, wrap(expected, { w: 'Float64Array' }));
     });
 });
 
@@ -269,17 +282,19 @@ describe('predefined types', () => {
         // Once it's fixed, unify this test with the one below.
         // [ new Date(NaN), null ],
     ])('Date %p to %p', (input, expected) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: { input: 'Date' },
             input: expected,
         });
-        testSerializeDeserialize(input, wrap(expected, { w: 'Date' }));
+        tester.serializeDeserialize(input, wrap(expected, { w: 'Date' }));
     });
 
     test('Invalid date', () => {
-        expect(UberJson.serialize({ input: new Date(NaN) })).toStrictEqual({
-            $: { input: 'Date' },
-            input: null,
+        tester.serialize({ input: new Date(NaN) }, serialized => {
+            expect(serialized).toStrictEqual({
+                $: { input: 'Date' },
+                input: null,
+            });
         });
     });
 
@@ -287,29 +302,31 @@ describe('predefined types', () => {
         [ /abc/g, '/abc/g' ],
         [ /a.*([^{]){0,4}/, '/a.*([^{]){0,4}/' ],
     ])('RegExp %p to %p', (input, expected) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: { input: 'RegExp' },
             input: expected,
         });
-        testSerializeDeserialize(input, wrap(expected, { w: 'RegExp' }));
+        tester.serializeDeserialize(input, wrap(expected, { w: 'RegExp' }));
     });
 
     test.each([
         [ new URL('https://example.com'), 'https://example.com/' ],
         [ new URL('https://example.com/abc%20efg?param=value&next=true#fragment'), 'https://example.com/abc%20efg?param=value&next=true#fragment' ],
     ])('URL %o to %p', (input, expected) => {
-        testSerializeDeserialize({ input }, {
+        tester.serializeDeserialize({ input }, {
             $: { input: 'URL' },
             input: expected,
         });
-        testSerializeDeserialize(input, wrap(expected, { w: 'URL' }));
+        tester.serializeDeserialize(input, wrap(expected, { w: 'URL' }));
     });
 
-    // TODO Error
+    // TODO Add support for Symbol
+    // TODO Add support for Temporal
+    // TODO Add support for Error
     // test.each([
     //     [ new Error('error message'), 'error message' ],
     // ])('Error %p to %p', (input, expected) => {
-    //     testSerializeDeserialize({ input }, {
+    //     tester.serializeDeserialize({ input }, {
     //         $: { input: 'Error' },
     //         input: expected,
     //     });

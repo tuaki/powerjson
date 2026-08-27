@@ -1,25 +1,46 @@
-import type { Annotation, JsonObject } from './json.js';
+import type { TypeId, JsonObject } from './json.js';
 import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transformer } from './transformers.js';
-import { Serializer } from './serializer.js';
-import { Deserializer } from './deserializer.js';
+import type { Serializer } from './serializer.js';
+import { SimpleSerializer } from './simpleSerializer.js';
+import { DeduplicatedSerializer } from './deduplicatedSerializer.js';
+import type { Deserializer } from './deserializer.js';
+import { SimpleDeserializer } from './simpleDeserializer.js';
+import { DeduplicatedDeserializer } from './deduplicatedDeserializer.js';
+
+type AlgorithmConstructor<T> = {
+    new (uberJson: UberJson): T;
+};
 
 export class UberJson {
     readonly deduplicate: boolean;
+    readonly sortObjectKeys: boolean;
 
-    // TODO Use enum with "none", "all", "circular".
-    // "none" might be a good optímization for non-circular data.
-    constructor({ deduplicate = false }: { deduplicate?: boolean } = {}) {
+    readonly serializerConstructor: AlgorithmConstructor<Serializer>;
+    readonly deserializerConstructor: AlgorithmConstructor<Deserializer>;
+
+    constructor({
+        deduplicate = false,
+        sortObjectKeys = false,
+    }: {
+        deduplicate?: boolean;
+        sortObjectKeys?: boolean;
+    } = {}) {
         this.deduplicate = deduplicate;
+        this.sortObjectKeys = sortObjectKeys;
+
+        this.serializerConstructor = deduplicate ? DeduplicatedSerializer : SimpleSerializer;
+        this.deserializerConstructor = deduplicate ? DeduplicatedDeserializer : SimpleDeserializer;
+
         this.addTransformers();
     }
 
     serialize(value: unknown): JsonObject {
-        const serializer = new Serializer(this);
+        const serializer = new this.serializerConstructor(this);
         return serializer.serialize(value);
     }
 
     deserialize(jsonValue: JsonObject) {
-        const deserializer = new Deserializer(this);
+        const deserializer = new this.deserializerConstructor(this);
         return deserializer.deserialize(jsonValue);
     }
 
@@ -33,26 +54,30 @@ export class UberJson {
 
 
     private readonly transformersByPrototype: Map<ObjectLike, Transformer> = new Map();
-    private readonly transformersByAnnotation: Map<string, Transformer> = new Map();
+    private readonly transformersByType: Map<string, Transformer> = new Map();
 
     /**
      * Registers a transformer for a specific type.
      * Unless override is set to true, it will throw an error if a transformer for the same type or annotation is already registered.
      */
     registerTransformer(transformer: Transformer, options?: { override?: boolean }): void {
-        const prototype = transformer.type.prototype;
+        const prototype = transformer.clazz.prototype;
 
         if (!options?.override) {
-            if (this.transformersByPrototype.has(prototype))
-                throw new Error(`Transformer for type ${transformer.type.name} is already registered.`);
+            const existingByPrototype = this.transformersByPrototype.get(prototype);
+            if (existingByPrototype !== undefined)
+                throw new Error(`Transformer for class "${transformer.clazz.name}" is already registered with type "${existingByPrototype.type}".`);
 
-            if (transformer.annotation !== undefined && this.transformersByAnnotation.has(transformer.annotation))
-                throw new Error(`Transformer for annotation ${transformer.annotation} is already registered.`);
+            if (transformer.type !== undefined) {
+                const existingByType = this.transformersByType.get(transformer.type);
+                if (existingByType !== undefined)
+                    throw new Error(`Transformer for type "${transformer.type}" is already registered with class "${existingByType.clazz.name}".`);
+            }
         }
 
         this.transformersByPrototype.set(prototype, transformer);
-        if (transformer.annotation !== undefined)
-            this.transformersByAnnotation.set(transformer.annotation, transformer);
+        if (transformer.type !== undefined)
+            this.transformersByType.set(transformer.type, transformer);
     }
 
     // There are several ways how to dispatch objects by type. We can use `instanceof`, `value.constructor`, or `Object.getPrototypeOf(value)`.
@@ -86,12 +111,10 @@ export class UberJson {
         return this.transformersByPrototype.get(defaultPrototype)!;
     }
 
-    getTransformerForAnnotation(annotation: Annotation): Transformer {
-        const typeName = typeof annotation === 'string' ? annotation : annotation[0];
-
-        const transformer = this.transformersByAnnotation.get(typeName);
+    getTransformerForType(typeId: TypeId): Transformer {
+        const transformer = this.transformersByType.get(typeId);
         if (!transformer)
-            throw new Error(`No transformer found for annotation: ${annotation}`);
+            throw new Error(`No transformer found for type: ${typeId}`);
 
         return transformer;
     }

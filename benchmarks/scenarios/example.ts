@@ -1,4 +1,4 @@
-import { type Scenario } from '../measure.js';
+import type { Scenario } from '../measure.js';
 import { createRealisticApiCall } from './realisticApiCall.js';
 
 export function exampleScenario(): Scenario {

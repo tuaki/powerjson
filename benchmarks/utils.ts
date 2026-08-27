@@ -1,42 +1,39 @@
-export type TimeUnit = {
+export type UnitType = 'time' | 'size';
+
+export type Unit = {
     label: string;
     divisor: number;
+    format: (value: number) => string;
 };
 
-const timeUnits: TimeUnit[] = [
+export function selectUnit(unitType: UnitType, values: number[]): Unit {
+    switch (unitType) {
+        case 'time':
+            return selectCommonUnit(values, timeUnits);
+        case 'size':
+            return selectCommonUnit(values, sizeUnits);
+    }
+}
+
+const timeUnits: Unit[] = [
     { label: 'ms', divisor: 1 },
     { label: 's', divisor: 1_000 },
-];
+].map(unit => ({
+    ...unit,
+    format: (value: number) => formatNumber(value, unit.divisor),
+}));
 
-export function selectTimeUnit(values: number[]): TimeUnit {
-    return selectCommonUnit(values, timeUnits) as TimeUnit;
-}
-
-export function formatTime(valueMs: number, timeUnit: TimeUnit): string {
-    return (valueMs / timeUnit.divisor).toFixed(3);
-}
-
-export type SizeUnit = {
-    label: string;
-    divisor: number;
-};
-
-const sizeUnits: SizeUnit[] = [
+const sizeUnits: Unit[] = [
     { label: 'B', divisor: 1 },
     { label: 'KB', divisor: 1024 },
     { label: 'MB', divisor: 1024 ** 2 },
     { label: 'GB', divisor: 1024 ** 3 },
-];
+].map(unit => ({
+    ...unit,
+    format: (value: number) => formatNumber(value, unit.divisor),
+}));
 
-export function selectSizeUnit(values: number[]): SizeUnit {
-    return selectCommonUnit(values, sizeUnits) as SizeUnit;
-}
-
-export function formatSize(valueBytes: number, sizeUnit: SizeUnit): string {
-    return (valueBytes / sizeUnit.divisor).toFixed(3);
-}
-
-function selectCommonUnit(values: number[], units: TimeUnit[] | SizeUnit[]): TimeUnit | SizeUnit {
+function selectCommonUnit(values: number[], units: Unit[]): Unit {
     const largestValue = Math.max(...values.filter(Number.isFinite), 0);
 
     let selectedUnit = units[0]!;
@@ -46,4 +43,11 @@ function selectCommonUnit(values: number[], units: TimeUnit[] | SizeUnit[]): Tim
     }
 
     return selectedUnit;
+}
+
+function formatNumber(value: number, divisor: number): string {
+    if (!Number.isFinite(value))
+        return 'NaN';
+
+    return (value / divisor).toFixed(3);
 }

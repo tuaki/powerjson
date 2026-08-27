@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { type Scenario } from '../measure.js';
+import type { Scenario } from '../measure.js';
 
 export function smallPayloadBurstScenario(): Scenario {
     return {

@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { type Scenario } from '../measure.js';
+import type { Scenario } from '../measure.js';
 
 export function repeatedTemporalValuesScenario(): Scenario {
     return {
@@ -7,6 +7,7 @@ export function repeatedTemporalValuesScenario(): Scenario {
         name: 'Repeated Temporal Values',
         description: 'A realistic workload with many repeated Date and URL instances shared across entries.',
         iterations: 100,
+        batches: 10,
         getData: createRepeatedTemporalValues,
     };
 }

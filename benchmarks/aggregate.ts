@@ -1,51 +1,25 @@
 import type { ScenarioResult, SerializerResult } from './measure.js';
-import { formatSize, formatTime, selectSizeUnit, selectTimeUnit, type SizeUnit, type TimeUnit } from './utils.js';
+import { selectUnit, type Unit, type UnitType } from './utils.js';
 
-type ComparisonUnit = 'time' | 'size';
-
-type ComparisonMetric = {
+export type ComparisonMetric = {
     id: string;
-    label: string;
-    unitType: ComparisonUnit;
+    /** If different from the id. */
+    label?: string;
+    unitType: UnitType;
     value: (result: SerializerResult) => number;
 };
 
-type SerializerComparisonGroup = {
-    title: string;
+export type ComparisonGroup = {
     serializers: string[];
+    label?: string;
 };
 
-const COMPARED_METRICS: ComparisonMetric[] = [ {
-    id: 'stringify',
-    label: 'stringify',
-    unitType: 'time',
-    value: result => result.serializeMs + result.toJsonMs,
-}, {
-    id: 'parse',
-    label: 'parse',
-    unitType: 'time',
-    value: result => result.deserializeMs + result.fromJsonMs,
-}, {
-    id: 'size',
-    label: 'size',
-    unitType: 'size',
-    value: result => result.stringSizeBytes,
-} ];
-
-const SERIALIZER_GROUPS: SerializerComparisonGroup[] = [ {
-    title: 'uberjson vs superjson',
-    serializers: [ 'uberjson', 'superjson' ],
-}, {
-    title: 'uberjson (deduplicate) vs superjson (dedupe)',
-    serializers: [ 'uberjson (deduplicate)', 'superjson (dedupe)' ],
-} ];
-
-export function printComparisonTables(results: ScenarioResult[]) {
-    for (const group of SERIALIZER_GROUPS)
-        printComparisonTable(results, group, COMPARED_METRICS);
+export function printComparisonTables(results: ScenarioResult[], groups: ComparisonGroup[], metrics: ComparisonMetric[]) {
+    for (const group of groups)
+        printComparisonTable(results, group, metrics);
 }
 
-function printComparisonTable(results: ScenarioResult[], group: SerializerComparisonGroup, metrics: ComparisonMetric[]) {
+function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup, metrics: ComparisonMetric[]) {
     if (group.serializers.length === 0 || metrics.length === 0)
         return;
 
@@ -74,7 +48,7 @@ function printComparisonTable(results: ScenarioResult[], group: SerializerCompar
                 }
                 else {
                     const rawValue = metric.value(serializerResult);
-                    const text = formatMetricValue(rawValue, metric.unitType, unit);
+                    const text = unit.format(rawValue);
                     row[rowKey] = highlightComparedValue(text, rawValue, bestCompared, bestGlobal);
                 }
 
@@ -90,8 +64,13 @@ function printComparisonTable(results: ScenarioResult[], group: SerializerCompar
     // const columns = [ 'scenario', ...metrics.flatMap(metric => group.serializers.map(serializerName => `${metric.label} (${unitsByMetric.get(metric.id)!.label}) / ${serializerName}`)) ];
 
     console.log('');
-    console.log(`Comparison: ${group.title}`);
-    console.log(`Metrics: ${metrics.map(metric => `${metric.label} (${unitsByMetric.get(metric.id)!.label})`).join(', ')}`);
+
+    const groupLabel = group.label ?? group.serializers.join(' vs ');
+    console.log(`Comparison: ${groupLabel}`);
+
+    const metricsLabel = metrics.map(metric => `${metric.label ?? metric.id} (${unitsByMetric.get(metric.id)!.label})`).join(', ');
+    console.log(`Metrics: ${metricsLabel}`);
+
     console.table(rows);
     // console.table(rows, columns);
 }
@@ -100,8 +79,8 @@ function selectUnitsByMetric(
     results: ScenarioResult[],
     serializerNames: string[],
     metrics: ComparisonMetric[],
-): Map<string, TimeUnit | SizeUnit> {
-    const units = new Map<string, TimeUnit | SizeUnit>();
+): Map<string, Unit> {
+    const units = new Map<string, Unit>();
 
     for (const metric of metrics) {
         const values: number[] = [];
@@ -113,7 +92,7 @@ function selectUnitsByMetric(
             }
         }
 
-        const unit = metric.unitType === 'time' ? selectTimeUnit(values) : selectSizeUnit(values);
+        const unit = selectUnit(metric.unitType, values);
         units.set(metric.id, unit);
     }
 
@@ -138,14 +117,9 @@ function isBest(value: number, best: number): boolean {
     if (!Number.isFinite(value) || !Number.isFinite(best))
         return false;
 
-    return Math.abs(value - best) <= 1e-9;
-}
-
-function formatMetricValue(value: number, unitType: ComparisonUnit, unit: TimeUnit | SizeUnit): string {
-    if (!Number.isFinite(value))
-        return 'NaN';
-
-    return unitType === 'time' ? formatTime(value, unit as TimeUnit) : formatSize(value, unit as SizeUnit);
+    // We expect the best value to be the smaller one.
+    const normalizedDiff = Math.abs((value - best) / best);
+    return normalizedDiff <= 1e-4;
 }
 
 function highlightComparedValue(valueText: string, value: number, bestCompared: number, bestGlobal: number): string {

@@ -1,4 +1,4 @@
-import { type Scenario } from '../measure.js';
+import type { Scenario } from '../measure.js';
 
 export function circularReferenceScenario(): Scenario {
     return {
@@ -7,6 +7,7 @@ export function circularReferenceScenario(): Scenario {
         description: 'A cyclic object graph with arrays, sets, and maps referencing each other.',
         skipSerializers: [ 'JSON', 'uberjson', 'superjson' ],
         iterations: 100,
+        batches: 100,
         getData: createCircularReference,
     };
 }

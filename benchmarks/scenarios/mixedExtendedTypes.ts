@@ -1,5 +1,5 @@
-import { type Scenario } from '../measure.js';
 import { faker } from '@faker-js/faker';
+import type { Scenario } from '../measure.js';
 
 export function mixedExtendedTypesScenario(): Scenario {
     return {
@@ -8,6 +8,7 @@ export function mixedExtendedTypesScenario(): Scenario {
         description: 'A payload that mixes Map, Set, Date, URL, undefined values, numeric edge cases, and object-valued maps.',
         skipSerializers: [ 'JSON' ],
         iterations: 1000,
+        batches: 100,
         getData: createMixedExtendedTypes,
     };
 }

@@ -1,4 +1,9 @@
-import type { AnnotatedJsonObject, JsonArray, JsonMap, JsonObject, JsonValue } from './json.js';
+import type { JsonArray, JsonMap, JsonObject, JsonValue, TypeId } from './json.js';
+import type { Serializer } from './serializer.js';
+import type { Deserializer } from './deserializer.js';
+
+// Numbers are serialized according to the Section 7.1.12.1 of the [ECMA 262](https://www.ecma-international.org/ecma-262/10.0/index.html) standard with the exception of `-0` (which is converted to "-0"` instead of `"0"`).
+// Additionally, JSON doesn't support strings for numbers, so the four special string values are expressed in their string form (with extra `"`) instead of raw numbers.
 
 const PLUS_INFINITY = 'Infinity';
 const MINUS_INFINITY = '-Infinity';
@@ -42,62 +47,46 @@ export type Primitive = undefined | null | string | number | boolean | bigint | 
  */
 export type ObjectLike = object;
 
-export type Constructor<T = unknown> = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- This is needed for `new` operator. Nothing else really works.
-    new (...args: any[]): T;
-};
-
-export type ISerializer = {
-    serialize(value: unknown): AnnotatedJsonObject;
-
-    serializePlainObject(value: Record<string, unknown>): AnnotatedJsonObject;
-    serializeArray(value: unknown[]): JsonArray;
-    serializeSet(value: Set<unknown>): JsonArray;
-    serializeMap(value: Map<unknown, unknown>): JsonMap;
-};
-
-export type IDeserializer = {
-    deserialize(value: AnnotatedJsonObject): unknown;
-
-    deserializePlainObject(value: JsonObject): Record<string, unknown>;
-    deserializeArray(value: JsonArray): unknown[];
-    deserializeSet(value: JsonArray): Set<unknown>;
-    deserializeMap(value: JsonMap): Map<unknown, unknown>;
-};
-
 export type Transformer<TObject extends ObjectLike = ObjectLike> = {
-    // TODO Use the type or its prototype?
-    type: Constructor<TObject>;
-    annotation: string | undefined;
-    /**
-     * Reference types are subject to deduplication and circular reference detection. Value types are not.
-     */
-    isReferenceType: boolean;
+    clazz: Clazz<TObject>;
+    type: TypeId | undefined;
     /**
      * Serializes the value to a JSON value.
      * If undefined is returned, the value will be skipped from objects, sets, and maps. However, it will be kept in arrays as `null` to preserve indexes.
      * Try `JSON.stringify({ a: undefined })` and `JSON.stringify([ undefined ])` to see the difference.
-     */
-    serialize(value: TObject, serializer: ISerializer): JsonValue | undefined;
+    */
+    serialize(value: TObject, serializer: Serializer): JsonValue | undefined;
     /**
-     * Deserializes the value from a JSON value and an annotation.
-     */
-    deserialize(value: JsonValue, deserializer: IDeserializer): TObject;
+    * Deserializes the value from a JSON value and a type annotation.
+   */
+    deserialize(value: JsonValue, deserializer: Deserializer): TObject;
+    /**
+   * Entities are subject to deduplication and circular reference detection. Values are not.
+   */
+    isEntity: boolean;
+    /**
+   * Composite types are serialized as arrays and share one composite annotation. Non-composite types are serialized as objects (and have their own annotations) or primitives.
+   */
+    isComposite: boolean;
 };
 
-function transformer<TObject extends ObjectLike, TJson extends JsonValue>(
-    type: Constructor<TObject>,
-    annotation: string | undefined,
-    isReferenceType: boolean,
-    serialize: (value: TObject, serializer: ISerializer) => TJson | undefined,
-    deserialize: (value: TJson, deserializer: IDeserializer) => TObject,
-): Transformer<TObject> {
+type Clazz<T> = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- This is needed for `new` operator. Nothing else really works.
+    new (...args: any[]): T;
+};
+
+export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config: {
+    clazz: Clazz<TObject>;
+    type: TypeId | undefined;
+    serialize: (value: TObject, serializer: Serializer) => TJson | undefined;
+    deserialize: (value: TJson, deserializer: Deserializer) => TObject;
+    isEntity?: boolean;
+    isComposite?: boolean;
+}): Transformer<TObject> {
     return {
-        type,
-        annotation,
-        isReferenceType,
-        serialize,
-        deserialize,
+        isEntity: false,
+        isComposite: false,
+        ...config,
     };
 }
 
@@ -109,14 +98,13 @@ function transformer<TObject extends ObjectLike, TJson extends JsonValue>(
 
 // #region Containers
 
-const plainObjectTransformer = transformer(
-    // NICE_TO_HAVE Not pretty.
-    Object as unknown as Constructor<Record<string, unknown>>,
-    undefined,
-    true,
-    (value: Record<string, unknown>, serializer: ISerializer) => serializer.serializePlainObject(value),
-    (value: JsonObject, deserializer: IDeserializer) => deserializer.deserializePlainObject(value),
-);
+const plainObjectTransformer = transformer({
+    clazz: Object as unknown as Clazz<Record<string, unknown>>,
+    type: undefined,
+    serialize: (value: Record<string, unknown>, serializer: Serializer) => serializer.serializePlainObject(value),
+    deserialize: (value: JsonObject, deserializer: Deserializer) => deserializer.deserializePlainObject(value),
+    isEntity: true,
+});
 
 /**
  * We should check object keys whenever we directly write to them like `object[key] = ...`.
@@ -127,75 +115,84 @@ export function validateObjectKey(key: string) {
         throw new Error(`Invalid object key: ${key}. Remove it to avoid prototype pollution.`);
 }
 
-const arrayTransformer = transformer(
-    Array,
-    undefined,
-    true,
-    (value: unknown[], serializer: ISerializer) => serializer.serializeArray(value),
-    (value: JsonArray, deserializer: IDeserializer) => deserializer.deserializeArray(value),
-);
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+    if (typeof value !== 'object' || value === null)
+        return false;
 
-const setTransformer = transformer(
-    Set,
-    'Set',
-    true,
-    (value: Set<unknown>, serializer: ISerializer) => serializer.serializeSet(value),
-    (value: JsonArray, deserializer: IDeserializer) => deserializer.deserializeSet(value),
-);
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
 
-const mapTransformer = transformer(
-    Map,
-    'Map',
-    true,
-    (value: Map<unknown, unknown>, serializer: ISerializer) => serializer.serializeMap(value),
-    (value: JsonMap, deserializer: IDeserializer) => deserializer.deserializeMap(value),
-);
+
+const arrayTransformer = transformer({
+    clazz: Array,
+    type: undefined,
+    serialize: (value: unknown[], serializer: Serializer) => serializer.serializeArray(value),
+    deserialize: (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeArray(value),
+    isEntity: true,
+    isComposite: true,
+});
+
+const setTransformer = transformer({
+    clazz: Set,
+    type: 'Set',
+    serialize: (value: Set<unknown>, serializer: Serializer) => serializer.serializeSet(value),
+    deserialize: (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeSet(value),
+    isEntity: true,
+    isComposite: true,
+});
+
+const mapTransformer = transformer({
+    clazz: Map,
+    type: 'Map',
+    serialize: (value: Map<unknown, unknown>, serializer: Serializer) => serializer.serializeMap(value),
+    deserialize: (value: JsonMap, deserializer: Deserializer) => deserializer.deserializeMap(value),
+    isEntity: true,
+    isComposite: true,
+});
 
 // #endregion
 // #region Predefined types
 
-const dateTransformer = transformer(
-    Date,
-    'Date',
-    false,
-    (value: Date): string | null => {
+const dateTransformer = transformer({
+    clazz: Date,
+    type: 'Date',
+    serialize: (value: Date): string | null => {
         // Date can be invalid; let's serialize it as null.
         return isNaN(+value) ? null : value.toISOString();
     },
-    (value: string | null): Date => {
+    deserialize: (value: string | null): Date => {
         return new Date(value === null ? NaN : value);
     },
-);
+});
 
-const regexpTransformer = transformer(
-    RegExp,
-    'RegExp',
-    false,
-    (value: RegExp): string => {
+const regexpTransformer = transformer({
+    clazz: RegExp,
+    type: 'RegExp',
+    serialize: (value: RegExp): string => {
         // Returns a string in the form of `/pattern/flags`.
         return value.toString();
     },
-    (value: string): RegExp => {
+    deserialize: (value: string): RegExp => {
         const body = value.slice(1, value.lastIndexOf('/'));
         const flags = value.slice(value.lastIndexOf('/') + 1);
         return new RegExp(body, flags);
     },
-);
+});
 
-const urlTransformer = transformer(
-    URL,
-    'URL',
-    false,
-    (value: URL): string => {
+const urlTransformer = transformer({
+    clazz: URL,
+    type: 'URL',
+    serialize: (value: URL): string => {
         return value.toString();
     },
-    (value: string): URL => {
+    deserialize: (value: string): URL => {
         return new URL(value);
     },
-);
+});
 
-// TODO Temporal
-// TODO Error
+// TODO Add support for Temporal
+// TODO Add support for Error
 
 export const baseTransformers = {
     plainObject: plainObjectTransformer,
@@ -215,6 +212,7 @@ const typedArrayConstructors = [
     Uint16Array,
     Int32Array,
     Uint32Array,
+    // NICE_TO_HAVE Remove this once the support is universal.
     ...(typeof Float16Array !== 'undefined' ? [ Float16Array ] : []),
     Float32Array,
     Float64Array,
@@ -226,11 +224,10 @@ type TypedArray = InstanceType<typeof typedArrayConstructors[number]>;
 
 const BASE64_ALPHABET = 'base64url';
 
-export const typedArrayTransformers = typedArrayConstructors.map(constructor => transformer(
-    constructor,
-    constructor.name,
-    false,
-    (value: TypedArray) => {
+export const typedArrayTransformers = typedArrayConstructors.map(clazz => transformer({
+    clazz,
+    type: clazz.name,
+    serialize: (value: TypedArray) => {
         // Only Uint8Array has a built-in base64 methods.
         //
         // The platform's endianness matters. The specs don't require a particular endianness for typed arrays. However, all mainstream JS engines use little-endian so we should be fine.
@@ -238,11 +235,11 @@ export const typedArrayTransformers = typedArrayConstructors.map(constructor => 
         const uint8Array = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
         return uint8Array.toBase64({ alphabet: BASE64_ALPHABET });
     },
-    (value: string) => {
+    deserialize: (value: string) => {
         const bytes = Uint8Array.fromBase64(value, { alphabet: BASE64_ALPHABET });
         // Gotcha! The typed arrays expose `byteLength` in bytes, but their constructors expect the length in elements.
-        return new constructor(bytes.buffer, bytes.byteOffset, bytes.byteLength / constructor.BYTES_PER_ELEMENT);
+        return new clazz(bytes.buffer, bytes.byteOffset, bytes.byteLength / clazz.BYTES_PER_ELEMENT);
     },
-));
+}));
 
 // #endregion

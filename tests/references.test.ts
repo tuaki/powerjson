@@ -1,126 +1,172 @@
 import { expect, test, describe } from 'bun:test';
-import { nonReferenceTypes, testReferences, testSerializeDeserialize } from './utils.js';
+import { Tester } from './utils.js';
 import { UberJson } from '../src/uberJson.js';
 import SuperJson from 'superjson';
 
 describe('circular references', () => {
+    const tester = new Tester([
+        new UberJson({ deduplicate: false }),
+        new UberJson({ deduplicate: true }),
+    ]);
+
+    const o: Record<string, unknown> = { name: 'o' };
+    o.self = o;
+
+    test('1 object, nested', () => {
+        tester.serializeDeserialize({ o }, {
+            o: {
+                $: { self: 'ref' },
+                name: 'o',
+                self: 1,
+            },
+        }, {
+            $: { o: 1 },
+            o: {
+                $: { self: 'ref' },
+                name: 'o',
+                self: 1,
+            },
+        });
+    });
+
+    test('1 object, root', () => {
+        tester.serializeDeserialize(o, {
+            $: { self: 'ref' },
+            name: 'o',
+            self: 0,
+        });
+    });
+
     const a: Record<string, unknown> = { name: 'a' };
     const b = { name: 'b', a };
     a.b = b;
 
     test('2 objects, nested', () => {
-        testSerializeDeserialize({ a }, {
+        tester.serializeDeserialize({ a }, {
             a: {
                 name: 'a',
                 b: {
                     $: { a: 'ref' },
                     name: 'b',
-                    a: 'a',
+                    a: 1,
+                },
+            },
+        }, {
+            $: { a: 1 },
+            a: {
+                name: 'a',
+                b: {
+                    $: { a: 'ref' },
+                    name: 'b',
+                    a: 1,
                 },
             },
         });
     });
 
     test('2 objects, root', () => {
-        testSerializeDeserialize(a, {
+        tester.serializeDeserialize(a, {
             name: 'a',
             b: {
                 $: { a: 'ref' },
                 name: 'b',
-                a: '',
+                a: 0,
             },
-        });
-    });
-
-    const c: Record<string, unknown> = { name: 'c' };
-    c.self = c;
-
-    test('1 object, nested', () => {
-        testSerializeDeserialize({ c }, {
-            c: {
-                $: { self: 'ref' },
-                name: 'c',
-                self: 'c',
-            },
-        });
-    });
-
-    test('1 object, root', () => {
-        testSerializeDeserialize(c, {
-            $: { self: 'ref' },
-            name: 'c',
-            self: '',
         });
     });
 
     test('3 objects', () => {
-        // It seems unnecessary but this actually solved a bug.
+        // This seems excessive but it actually solved a bug.
         const input = { name: 'root', childA: a, childB: b };
-        const expectedSerialized = {
+
+        tester.serializeDeserialize(input, {
             name: 'root',
             childA: {
+                name: 'a',
                 b: {
                     $: { a: 'ref' },
-                    a: 'childA',
                     name: 'b',
+                    a: 1,
                 },
-                name: 'a',
             },
             childB: {
+                name: 'b',
                 a: {
                     $: { b: 'ref' },
-                    b: 'childA.b',
                     name: 'a',
+                    b: 1,
                 },
-                name: 'b',
             },
-        };
-
-        const serialized = UberJson.serialize(input);
-        expect(serialized).toStrictEqual(expectedSerialized);
-
-        const parsed = JSON.parse(JSON.stringify(serialized));
-        expect(() => UberJson.deserialize(parsed)).not.toThrow();
-        // Further equivalence checks aren't possible due to circular references.
-        // We also can't chceck references, because they are not preserved in full (`deduplicate` is false).
+        }, {
+            $: { childA: 1, childB: 'ref' },
+            name: 'root',
+            childA: {
+                $: { b: 2 },
+                name: 'a',
+                b: {
+                    $: { a: 'ref' },
+                    name: 'b',
+                    a: 1,
+                },
+            },
+            childB: 2,
+        });
     });
 
-    test('3 objects, deduplicate', () => {
-        const uberJson = new UberJson({ deduplicate: true });
-        const input = { name: 'root', childA: a, childB: b };
-
-        const serialized = uberJson.serialize(input);
-        const parsed = JSON.parse(JSON.stringify(serialized));
-
-        const deserialized = uberJson.deserialize(parsed);
-        expect(deserialized).toStrictEqual(input);
-
-        testReferences(input, deserialized);
-    });
-
-    test('2 arrays', () => {
+    test('2 arrays, nested', () => {
         const x: unknown[] = [ 'x' ];
         const y = [ 'y', x ];
         x.push(y);
 
-        testSerializeDeserialize({ x }, {
-            $: { 'x.1.1': 'ref' },
+        tester.serializeDeserialize({ x }, {
+            $: { x: { 4: 'ref' } },
             x: [
                 'x',
-                [ 'y', 'x' ],
+                [ 'y', 1 ],
+            ],
+        }, {
+            $: { x: { 0: 1, 4: 'ref' } },
+            x: [
+                'x',
+                [ 'y', 1 ],
             ],
         });
     });
 
-    test('1 array', () => {
+    test('1 array, nested', () => {
         const z: unknown[] = [ 'z' ];
         z.push(z);
 
-        testSerializeDeserialize({ z }, {
-            $: { 'z.1': 'ref' },
+        tester.serializeDeserialize({ z }, {
+            $: { z: { 2: 'ref' } },
             z: [
                 'z',
+                1,
+            ],
+        }, {
+            $: { z: { 0: 1, 2: 'ref' } },
+            z: [
                 'z',
+                1,
+            ],
+        });
+    });
+
+    test('1 array, root', () => {
+        const z: unknown[] = [ 'z' ];
+        z.push(z);
+
+        tester.serializeDeserialize(z, {
+            $: { $: 'wrapped', w: { 2: 'ref' } },
+            w: [
+                'z',
+                1,
+            ],
+        }, {
+            $: { $: 'wrapped', w: { 0: 1, 2: 'ref' } },
+            w: [
+                'z',
+                1,
             ],
         });
     });
@@ -129,10 +175,32 @@ describe('circular references', () => {
         const s = new Set();
         s.add(s);
 
-        testSerializeDeserialize({ s }, {
-            $: { s: 'Set', 's.0': 'ref' },
+        tester.serializeDeserialize({ s }, {
+            $: { s: { 0: 'Set', 1: 'ref' } },
             s: [
-                's',
+                1,
+            ],
+        }, {
+            $: { s: { 0: [ 'Set', 1 ], 1: 'ref' } },
+            s: [
+                1,
+            ],
+        });
+    });
+
+    test('set root', () => {
+        const s = new Set();
+        s.add(s);
+
+        tester.serializeDeserialize(s, {
+            $: { $: 'wrapped', w: { 0: 'Set', 1: 'ref' } },
+            w: [
+                1,
+            ],
+        }, {
+            $: { $: 'wrapped', w: { 0: [ 'Set', 1 ], 1: 'ref' } },
+            w: [
+                1,
             ],
         });
     });
@@ -141,10 +209,32 @@ describe('circular references', () => {
         const m = new Map();
         m.set(m, m);
 
-        testSerializeDeserialize({ m }, {
-            $: { m: 'Map', 'm.0.0': 'ref', 'm.0.1': 'ref' },
+        tester.serializeDeserialize({ m }, {
+            $: { m: { 0: 'Map', 2: 'ref', 3: 'ref' } },
             m: [
-                [ 'm', 'm' ],
+                [ 1, 1 ],
+            ],
+        }, {
+            $: { m: { 0: [ 'Map', 1 ], 2: 'ref', 3: 'ref' } },
+            m: [
+                [ 1, 1 ],
+            ],
+        });
+    });
+
+    test('map root', () => {
+        const m = new Map();
+        m.set(m, m);
+
+        tester.serializeDeserialize(m, {
+            $: { $: 'wrapped', w: { 0: 'Map', 2: 'ref', 3: 'ref' } },
+            w: [
+                [ 1, 1 ],
+            ],
+        }, {
+            $: { $: 'wrapped', w: { 0: [ 'Map', 1 ], 2: 'ref', 3: 'ref' } },
+            w: [
+                [ 1, 1 ],
             ],
         });
     });
@@ -205,7 +295,31 @@ describe('reference objects', () => {
 });
 
 describe('deduplication', () => {
-    const uberJson = new UberJson({ deduplicate: true });
+    const tester = new Tester([
+        new UberJson({ deduplicate: true }),
+    ]);
+
+
+    test('inserts ids to array without previous annotation', () => {
+        const object = { name: 'object' };
+        const array = [ object ];
+
+        const input = {
+            array,
+            object,
+        };
+
+        tester.serializeDeserialize(input, {
+            $: {
+                array: { 1: 2 },
+                object: 'ref',
+            },
+            array: [
+                { name: 'object' },
+            ],
+            object: 2,
+        });
+    });
 
     test('preserves references in containers', () => {
         const sharedObject = { name: 'shared' };
@@ -223,10 +337,7 @@ describe('deduplication', () => {
             },
         };
 
-        const output = uberJson.parse(uberJson.stringify(input));
-
-        expect(output).toStrictEqual(input);
-        testReferences(input, output);
+        tester.serializeDeserialize(input);
     });
 
     test('preserves references in maps and sets', () => {
@@ -246,10 +357,7 @@ describe('deduplication', () => {
             array: [ shared, set, map ],
         };
 
-        const output = uberJson.parse(uberJson.stringify(input));
-
-        expect(output).toStrictEqual(input);
-        testReferences(input, output);
+        tester.serializeDeserialize(input);
     });
 
     test('preserves references for keys that need path escaping', () => {
@@ -266,37 +374,131 @@ describe('deduplication', () => {
             },
         };
 
-        const output = uberJson.parse(uberJson.stringify(input));
+        tester.serializeDeserialize(input);
+    });
+});
 
-        expect(output).toStrictEqual(input);
-        testReferences(input, output);
+describe('shuffled json', () => {
+    const tester = new Tester([
+        new UberJson({ deduplicate: false }),
+        new UberJson({ deduplicate: true, sortObjectKeys: true }),
+    ], {
+        reverseJsonOrder: true,
     });
 
-    test('finds references behind excluded wrappers', () => {
-        class Wrapper {
-            constructor(readonly value: unknown) {}
-
-            self?: unknown;
-        }
-
-        const sharedA = { value: 1 };
-        const wrapperA = new Wrapper(sharedA);
-        wrapperA.self = wrapperA;
-
-        const sharedBFromWrapper = { value: 1 };
-        const wrapperB = new Wrapper(sharedBFromWrapper);
-        wrapperB.self = wrapperB;
-
-        const a = {
-            direct: sharedA,
-            wrapper: wrapperA,
-        };
-        const b = {
-            direct: { value: 1 },
-            wrapper: wrapperB,
+    test('reorders direct sibling references', () => {
+        const shared = { value: 1 };
+        const input = {
+            first: shared,
+            second: shared,
+            nested: { third: shared },
         };
 
-        expect(a).toStrictEqual(b);
-        expect(() => testReferences(a, b, [ ...nonReferenceTypes, Wrapper ])).toThrow();
+        tester.serializeDeserialize(input);
+    });
+
+    test('reorders nested repeated references across objects and arrays', () => {
+        const shared = { value: 1 };
+        const input = {
+            left: {
+                direct: shared,
+                list: [ shared, { value: 2, ref: shared }, [ shared ] ],
+            },
+            right: shared,
+            other: {
+                nested: { ref: shared },
+            },
+        };
+
+        tester.serializeDeserialize(input);
+    });
+
+    test('reorders mixed object graphs with cyclic references', () => {
+        const shared = { value: 1 };
+        const child = { name: 'child' };
+        const node: Record<string, unknown> = { name: 'root', child };
+        node.child = {
+            ...child,
+            parent: node,
+            ref: shared,
+        };
+        node.self = node;
+
+        const input = {
+            node,
+            alias: node,
+            shared,
+            list: [ shared, node.child, node ],
+        };
+
+        tester.serializeDeserialize(input);
+    });
+
+    test('reorders map and set entries while preserving inner references', () => {
+        const shared = { value: 1 };
+        const set = new Set([ shared, { value: 2, ref: shared } ]);
+        const map = new Map<unknown, unknown>([
+            [ shared, { inner: shared } ],
+            [ { value: 3 }, shared ],
+        ]);
+
+        const input = {
+            shared,
+            set,
+            map,
+            array: [ shared, set, map ],
+        };
+
+        tester.serializeDeserialize(input);
+    });
+
+    test('reorders deeply nested object keys inside arrays and objects', () => {
+        const shared = { value: 1 };
+        const input = {
+            root: {
+                a: [
+                    { ref: shared, b: shared },
+                    { c: { d: shared } },
+                ],
+            },
+            left: shared,
+            right: {
+                nested: [
+                    { q: shared },
+                    { p: { r: shared } },
+                ],
+            },
+        };
+
+        tester.serializeDeserialize(input);
+    });
+
+    test('reorders references inside escaped $ payload', () => {
+        const shared = { value: 1 };
+
+        const input = {
+            $: {
+                first: shared,
+                second: shared,
+            },
+        };
+
+        tester.serializeDeserialize(input);
+    });
+
+    test('reorders $ property and its siblings', () => {
+        const shared1 = { value: 1 };
+        const shared2 = { value: 2 };
+
+        const input = {
+            shared1,
+            $: {
+                shared1,
+                shared2,
+            },
+            shared2,
+        };
+
+        tester.serializeDeserialize(input);
     });
 });
