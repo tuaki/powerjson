@@ -189,8 +189,8 @@ describe('containers', () => {
 
 describe('special objects', () => {
     test.each([
-        [ { $: NaN }, { $: { $: { value: 'NaN', annotation: 'number' } } } ],
-        [ { $: [ NaN ] }, { $: { $: { value: [ 'NaN' ], annotation: { 1: 'number' } } } } ],
+        [ { $: NaN }, { $: { $$: 'number' }, $$: 'NaN' } ],
+        [ { $: [ NaN ] }, { $: { $$: { 1: 'number' } }, $$: [ 'NaN' ] } ],
     ])('object with escape key %p', (input, expected) => {
         tester.serializeDeserialize({ input }, { input: expected });
         tester.serializeDeserialize(input, expected);

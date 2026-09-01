@@ -1,14 +1,16 @@
 import { faker } from '@faker-js/faker';
-import type { Scenario } from '../measure.js';
+import type { Scenario } from '../measure.ts';
 
 export function realisticApiCallScenario(): Scenario {
     return {
         id: 'realistic-api-call',
         name: 'Realistic API Call',
-        description: 'A batch of realistic API call objects with embedded customers, Dates, undefined values, and integer cents.',
+        description: 'A batch of realistic API call objects with embedded customers, Dates, and undefined values.',
         iterations: 100,
         batches: 5,
         getData: createRealisticApiCalls,
+        // Too slow.
+        skipSerializers: [ 'next-json' ],
     };
 }
 

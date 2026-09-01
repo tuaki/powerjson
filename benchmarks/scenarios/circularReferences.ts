@@ -1,11 +1,11 @@
-import type { Scenario } from '../measure.js';
+import type { Scenario } from '../measure.ts';
 
 export function circularReferencesScenario(): Scenario {
     return {
         id: 'circular-references',
         name: 'Circular References',
         description: 'A cyclic object graph with arrays, sets, and maps referencing each other.',
-        skipSerializers: [ 'JSON' ],
+        skipSerializers: [ 'JSON', 'uberson-simple' ],
         iterations: 100,
         batches: 100,
         getData: createCircularReferences,

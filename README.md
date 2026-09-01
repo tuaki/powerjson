@@ -57,6 +57,12 @@ We try to keep the configuration minimal. However, in some use cases, these opti
 - `deduplicate` (default: `false`) - see the [Referential equality](./docs/advanced-topics.md#referential-equality) section for details.
 - `sortObjectKeys` (default: `false`) - see the [Object key order](./docs/advanced-topics.md#object-key-order) section for details.
 
+The default `UberJson` instance is immutable, but you can create a new instance with different configuration options:
+
+```ts
+const uberJson = new UberJson({ deduplicate: true });
+```
+
 ## Supported types
 
 These types are supported by UberJson (so far). More types will be added as they become part of the standard JavaScript API (e.g., `Temporal`).
@@ -75,6 +81,7 @@ These types are supported by UberJson (so far). More types will be added as they
 | `Set`                                                                                      | ❌                          | ✅                     |
 | `Map`                                                                                      | ❌                          | ✅                     |
 | `Date`                                                                                     | ❌                          | ✅                     |
+| `Temporal`                                                                                 | ❌                          | ❌ TODO                |
 | `RegExp`                                                                                   | ❌                          | ✅                     |
 | `URL`                                                                                      | ❌                          | ✅                     |
 | `Error`                                                                                    | ❌                          | ❌ TODO                |
@@ -85,7 +92,21 @@ These types are supported by UberJson (so far). More types will be added as they
 
 ### Custom classes
 
+Any object with an unsupported type will be serialized as a plain JS object. You can change that by registering a custom transformer for your class. For example, transformer for Luxon's `DateTime` might look like this:
 
+```ts
+UberJson.registerTransformer({
+    clazz: DateTime,
+    type: 'DateTime',
+    serialize: value => value.toISO()!,
+    deserialize: value => DateTime.fromISO(value, { setZone: true }),
+    isEntity: false,    // Referential equalities won't be preserved for this type (in the deduplication mode).
+    isComposite: false, // The type won't be serialized to an array (or, if it will, it won't use type annotations for its properties).
+});
+```
+
+See [custom tests](./tests/custom.test.ts) for more examples.
 
 ### Symbols
 
+TODO

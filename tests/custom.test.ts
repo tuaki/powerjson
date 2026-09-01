@@ -1,7 +1,6 @@
 import { expect, test, describe } from 'bun:test';
 import { UberJson } from '../src/uberJson.js';
 import { Tester } from './utils.js';
-import { transformer } from '../src/transformers.js';
 import { DateTime } from 'luxon';
 import { wrap } from './utils.js';
 
@@ -39,12 +38,14 @@ describe('Custom types', () => {
     });
 
     test('Luxon DateTime to ISO string', () => {
-        tester.registerTransformer(transformer({
+        tester.registerTransformer({
             clazz: DateTime,
             type: 'DateTime',
             serialize: value => value.toISO()!,
             deserialize: value => DateTime.fromISO(value, { setZone: true }),
-        }));
+            isEntity: false,
+            isComposite: false,
+        });
 
         const input = DateTime.utc(2026, 8, 27, 12, 34, 56);
         const serialized = input.toISO()!;
@@ -69,13 +70,15 @@ describe('Custom types', () => {
         }
     }
 
-    tester.registerTransformer(transformer({
+    tester.registerTransformer({
         clazz: SimpleDateTime,
         // Let's try a different name.
         type: 'SDT',
         serialize: value => value.iso,
         deserialize: value => SimpleDateTime.create(value),
-    }));
+        isEntity: false,
+        isComposite: false,
+    });
 
     test('class to primitive', () => {
         const input = SimpleDateTime.create('Bazinga!');
@@ -100,7 +103,7 @@ describe('Custom types', () => {
         }
     }
 
-    tester.registerTransformer(transformer({
+    tester.registerTransformer({
         clazz: Point,
         type: 'Point',
         // This should test that we can leverage the build-in functions to correctly handle composite indexes.
@@ -113,8 +116,9 @@ describe('Custom types', () => {
             const [ x, y, z ] = deserializer.deserializeArray(value) as [ number, number, number | undefined ];
             return new Point(x, y, z);
         },
+        isEntity: false,
         isComposite: true,
-    }));
+    });
 
     test('class to array', () => {
         const input = [
@@ -139,7 +143,7 @@ describe('Custom types', () => {
         }
     }
 
-    tester.registerTransformer(transformer({
+    tester.registerTransformer({
         clazz: Author,
         type: 'Author',
         // Let's try direct serialization.
@@ -147,11 +151,13 @@ describe('Custom types', () => {
         // But anything is possible if you are brave enough.
         serialize: value => ({ name: value.name }),
         // For example, this breaks references!
-        // Event though the serialization process will set the reference, there is no way how to access it here.
+        // Even though the serialization process will set the reference, there is no way how to access it here.
         // So, don't do this!
         // The internal API might be exposed in the future if a really good use case is found, but for now, it remains closed.
         deserialize: value => new Author((value as { name: string }).name),
-    }));
+        isEntity: false,
+        isComposite: false,
+    });
 
     class Comment {
         readonly author: Author;
@@ -167,16 +173,20 @@ describe('Custom types', () => {
         }
     }
 
-    tester.registerTransformer(transformer({
+    tester.registerTransformer({
         clazz: Comment,
         type: 'Comment',
         // This is kinda complex, so we use the built-in object functions.
-        serialize: (value, serializer) => serializer.serializePlainObject({
-            author: value.author,
-            content: value.content,
-            createdAt: value.createdAt,
-            responses: value.responses,
-        }),
+        // We could copy the object like this instead of casting it:
+        // serializer.serializePlainObject({
+        //     author: value.author,
+        //     content: value.content,
+        //     createdAt: value.createdAt,
+        //     responses: value.responses,
+        // })
+        // However, since we know that the object is just a plain object without any extra properties, we might as well save some work.
+        // Although this is probably not the best idea in general - for finer control, the explicit copying is better.
+        serialize: (value, serializer) => serializer.serializePlainObject(value as unknown as Record<string, unknown>),
         deserialize: (value, deserializer) => {
             const object = deserializer.deserializePlainObject(value) as {
                 author: Author;
@@ -187,7 +197,9 @@ describe('Custom types', () => {
 
             return new Comment(object.author, object.content, object.createdAt, object.responses);
         },
-    }));
+        isEntity: false,
+        isComposite: false,
+    });
 
     test('recursively nested classes', () => {
         const alice = new Author('Alice');
@@ -269,12 +281,14 @@ describe('Custom types', () => {
         }
     }
 
-    tester.registerTransformer(transformer({
+    tester.registerTransformer({
         clazz: A,
         type: 'A',
         serialize: value => ({ id: value.id }),
         deserialize: value => value as unknown as A,
-    }));
+        isEntity: false,
+        isComposite: false,
+    });
 
     class B extends A {
         readonly label: string;
@@ -294,7 +308,7 @@ describe('Custom types', () => {
         }
     }
 
-    tester.registerTransformer(transformer({
+    tester.registerTransformer({
         clazz: C,
         type: 'C',
         serialize: value => ({
@@ -306,7 +320,9 @@ describe('Custom types', () => {
             const object = value as { id: number, label: string, isActive: boolean };
             return new C(object.id, object.label, object.isActive);
         },
-    }));
+        isEntity: false,
+        isComposite: false,
+    });
 
     class D extends C {
         readonly extra: string;

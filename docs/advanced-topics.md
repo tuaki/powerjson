@@ -4,7 +4,7 @@ Although serialization seems like a simple task, there are many edge cases and n
 
 ## Escape key
 
-The `$` key is used for annotations. You can use it as a regular key in your objects, but we advise you not to do so. If you use it anyway, it will be escaped so expect a minor performance penalty.
+The `$` key is used for annotations. You can use it as a regular key in your objects, but we advise you not to do so. If you use it anyway, it will be escaped so expect a minor performance penalty. (Basically, any key consisting of only `$` characters will be extended with an additional `$` character.)
 
 There is no option to change the escape key. *This is by design.* We don't want to allow an infinite number of mutually incompatible UberJson variants.
 

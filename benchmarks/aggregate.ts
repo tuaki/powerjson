@@ -1,5 +1,6 @@
-import type { ScenarioResult, SerializerResult } from './measure.js';
-import { selectUnit, type Unit, type UnitType } from './utils.js';
+import Table from 'cli-table3';
+import type { ScenarioResult, SerializerResult } from './measure.ts';
+import { selectUnit, type Unit, type UnitType } from './utils.ts';
 
 export type ComparisonMetric = {
     id: string;
@@ -24,38 +25,39 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup,
         return;
 
     const unitsByMetric = selectUnitsByMetric(results, group.serializers, metrics);
+
+    const columns = [ 'scenario' ];
+    for (let metricIndex = 0; metricIndex < metrics.length; metricIndex++) {
+        for (let serializerIndex = 0; serializerIndex < group.serializers.length; serializerIndex++)
+            columns.push(`${String.fromCharCode('A'.charCodeAt(0) + serializerIndex)} ${metricIndex + 1}`);
+    }
+
     const rows = results.map(result => {
         const bySerializer = new Map(result.results.map(serializerResult => [ serializerResult.serializer, serializerResult ]));
-        const row: Record<string, string> = { scenario: result.scenario.name };
+        const row = [ result.scenario.name ];
 
         const bestComparedByMetric = new Map(metrics.map(metric => [ metric.id, findMetricBestForSerializers(result.results, metric, group.serializers) ]));
         const bestGlobalByMetric = new Map(metrics.map(metric => [ metric.id, findMetricBest(result.results, metric) ]));
 
-        let metricIndex = 0;
         for (const metric of metrics) {
-
             const unit = unitsByMetric.get(metric.id)!;
             const bestCompared = bestComparedByMetric.get(metric.id)!;
             const bestGlobal = bestGlobalByMetric.get(metric.id)!;
 
-            let serializerIndex = 0;
             for (const serializerName of group.serializers) {
-                const rowKey = `${String.fromCharCode('A'.charCodeAt(0) + serializerIndex)} ${metricIndex + 1}`;
-
                 const serializerResult = bySerializer.get(serializerName);
+
+                let valueText: string;
                 if (serializerResult === undefined) {
-                    row[rowKey] = '-';
+                    valueText = '-';
                 }
                 else {
                     const rawValue = metric.value(serializerResult);
                     const text = unit.format(rawValue);
-                    row[rowKey] = highlightComparedValue(text, rawValue, bestCompared, bestGlobal);
+                    valueText = highlightComparedValue(text, rawValue, bestCompared, bestGlobal);
                 }
-
-                serializerIndex++;
+                row.push(valueText);
             }
-
-            metricIndex++;
         }
 
         return row;
@@ -71,8 +73,18 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup,
     const metricsLabel = metrics.map(metric => `${metric.label ?? metric.id} (${unitsByMetric.get(metric.id)!.label})`).join(', ');
     console.log(`Metrics: ${metricsLabel}`);
 
-    console.table(rows);
-    // console.table(rows, columns);
+    const table = new Table({
+        head: columns,
+        style: {
+            head: [ 'white', 'bold' ],
+            border: [ 'white' ],
+        },
+    });
+
+    table.push(...rows);
+
+    process.stdout.write(table.toString());
+    process.stdout.write('\n');
 }
 
 function selectUnitsByMetric(
@@ -124,7 +136,7 @@ function isBest(value: number, best: number): boolean {
 
 function highlightComparedValue(valueText: string, value: number, bestCompared: number, bestGlobal: number): string {
     if (!isBest(value, bestCompared))
-        return valueText;
+        return Number.isNaN(value) ? colorRed(valueText) : valueText;
 
     return isBest(value, bestGlobal) ? colorBrightGreen(valueText) : colorGreen(valueText);
 }
@@ -135,4 +147,8 @@ function colorGreen(value: string): string {
 
 function colorBrightGreen(value: string): string {
     return `\u001b[1;32m${value}\u001b[0m`;
+}
+
+function colorRed(value: string): string {
+    return `\u001b[31m${value}\u001b[0m`;
 }

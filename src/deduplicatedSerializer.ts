@@ -1,6 +1,6 @@
-import { ESCAPE_KEY, REFERENCE_ANNOTATION, type AnnotatedJsonObject, type TypeId, type Annotations, type JsonObject, type EntityId, type CompositeAnnotation } from './json.js';
-import { Serializer } from './serializer.js';
-import type { ObjectLike } from './transformers.js';
+import { REFERENCE_ANNOTATION, type AnnotatedJsonObject, type TypeId, type Annotations, type JsonObject, type EntityId, type CompositeAnnotation } from './json.ts';
+import { deleteEscapeKeyIfEmpty, Serializer } from './serializer.ts';
+import type { ObjectLike } from './transformers.ts';
 
 export class DeduplicatedSerializer extends Serializer {
     override serialize(value: unknown): JsonObject {
@@ -18,10 +18,10 @@ export class DeduplicatedSerializer extends Serializer {
     // The annotation cleanup is delayed until the end of serialization because we need to know if an entity is referenced or not. If it is, we need to add an identity annotation to it, which means that the annotations object will not be empty.
 
     private cleanupEmptyAnnotations() {
-        for (const jsonObject of this.allJsonObjects) {
-            if (Object.keys(jsonObject[ESCAPE_KEY]!).length === 0)
-                delete jsonObject[ESCAPE_KEY];
-        }
+        const allJsonObjects = this.allJsonObjects;
+        const length = allJsonObjects.length;
+        for (let i = 0; i < length; i++)
+            deleteEscapeKeyIfEmpty(allJsonObjects[i]);
     }
 
     private readonly allJsonObjects: JsonObject[] = [];

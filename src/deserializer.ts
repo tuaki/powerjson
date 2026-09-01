@@ -1,6 +1,6 @@
-import { BIGINT_ANNOTATION, ESCAPE_KEY, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type EscapedProperty, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type TypeId } from './json.js';
-import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.js';
-import type { UberJson } from './uberJson.js';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type TypeId } from './json.ts';
+import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.ts';
+import type { UberJson } from './uberJson.ts';
 
 export abstract class Deserializer {
     readonly uberJson: UberJson;
@@ -10,7 +10,7 @@ export abstract class Deserializer {
     }
 
     deserialize(value: AnnotatedJsonObject): unknown {
-        const isWrapped = value[ESCAPE_KEY]?.[ESCAPE_KEY] === WRAPPED_DIRECTIVE;
+        const isWrapped = value[ESCAPE_CHAR]?.[ESCAPE_CHAR] === WRAPPED_DIRECTIVE;
 
         const deserialized = this.deserializePlainObject(value);
 
@@ -54,33 +54,38 @@ export abstract class Deserializer {
     // #region Objects
 
     deserializePlainObject(value: JsonObject): Record<string, unknown> {
-        const output = {} as Record<string, unknown>;
+        const output: Record<string, unknown> = {};
         this.trySetReference(output);
-        const annotations = value[ESCAPE_KEY] as Annotations | undefined;
+
+        const annotations = value[ESCAPE_CHAR] as Annotations | undefined;
 
         const prevAnnotation = this.annotation;
         const prevCompositeIndex = this.compositeIndex;
 
         // Context switch
 
-        for (const [ key, item ] of Object.entries(value)) {
+        const keys = Object.keys(value);
+        const length = keys.length;
+        for (let i = 0; i < length; i++) {
+            let key = keys[i];
+            const item = value[key];
+
             validateObjectKey(key);
 
-            if (key === ESCAPE_KEY)
-                continue;
+            if (key[0] === ESCAPE_CHAR) {
+                if (key === ESCAPE_CHAR)
+                    continue;
 
-            this.annotation = annotations?.[key];
+                this.annotation = annotations?.[key];
+                key = unescapeKey(key);
+            }
+            else {
+                this.annotation = annotations?.[key];
+            }
+
             this.compositeIndex = undefined;
 
             output[key] = this.deserializeValue(item);
-        }
-
-        const escapedProperty = annotations?.[ESCAPE_KEY] as EscapedProperty | undefined;
-        if (escapedProperty !== undefined) {
-            this.annotation = escapedProperty.annotation;
-            this.compositeIndex = undefined;
-
-            output[ESCAPE_KEY] = this.deserializeValue(escapedProperty.value);
         }
 
         // Context switch
@@ -100,7 +105,8 @@ export abstract class Deserializer {
         const output = Array(value.length);
         this.trySetReference(output);
 
-        for (let i = 0; i < value.length; i++)
+        const length = value.length;
+        for (let i = 0; i < length; i++)
             output[i] = this.deserializeArrayElement(value[i]);
 
         this.cleanupReference();
@@ -112,8 +118,9 @@ export abstract class Deserializer {
         const output = new Set();
         this.trySetReference(output);
 
-        for (const item of value)
-            output.add(this.deserializeArrayElement(item));
+        const length = value.length;
+        for (let i = 0; i < length; i++)
+            output.add(this.deserializeArrayElement(value[i]));
 
         this.cleanupReference();
 
@@ -124,13 +131,15 @@ export abstract class Deserializer {
         const output = new Map();
         this.trySetReference(output);
 
-        for (const [ key, item ] of value) {
+        const length = value.length;
+        for (let i = 0; i < length; i++) {
             // Map is also an array so the composite index must be defined here.
             this.compositeIndex!++;
 
+            const entry = value[i];
             output.set(
-                this.deserializeArrayElement(key),
-                this.deserializeArrayElement(item),
+                this.deserializeArrayElement(entry[0]),
+                this.deserializeArrayElement(entry[1]),
             );
         }
 

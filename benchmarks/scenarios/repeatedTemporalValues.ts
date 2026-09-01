@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { Scenario } from '../measure.js';
+import type { Scenario } from '../measure.ts';
 
 export function repeatedTemporalValuesScenario(): Scenario {
     return {
@@ -9,6 +9,8 @@ export function repeatedTemporalValuesScenario(): Scenario {
         iterations: 100,
         batches: 10,
         getData: createRepeatedTemporalValues,
+        // Too slow.
+        skipSerializers: [ 'next-json' ],
     };
 }
 

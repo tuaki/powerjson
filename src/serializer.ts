@@ -1,7 +1,6 @@
-import { BIGINT_ANNOTATION, ESCAPE_KEY, NUMBER_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type EscapedProperty, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type TypeId } from './json.js';
-import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike } from './transformers.js';
-import type { UberJson } from './uberJson.js';
-import { ensureProperty } from './utils.js';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type TypeId } from './json.ts';
+import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike } from './transformers.ts';
+import type { UberJson } from './uberJson.ts';
 
 export abstract class Serializer {
     readonly uberJson: UberJson;
@@ -19,8 +18,13 @@ export abstract class Serializer {
         const serialized = this.serializePlainObject(input);
 
         if (isWrapped) {
-            const annotations = ensureProperty(serialized, ESCAPE_KEY, {});
-            annotations[ESCAPE_KEY] = WRAPPED_DIRECTIVE;
+            let annotations = serialized[ESCAPE_CHAR];
+            if (annotations === undefined) {
+                annotations = {};
+                serialized[ESCAPE_CHAR] = annotations;
+            }
+
+            annotations[ESCAPE_CHAR] = WRAPPED_DIRECTIVE;
         }
 
         return serialized;
@@ -47,36 +51,17 @@ export abstract class Serializer {
 
         if (this.compositeIndex === undefined) {
             // No need to check for an old composite since we are not nested in any array, so no composite can exist yet.
-            if (key === ESCAPE_KEY)
-                this.getEscapedProperty().annotation = typeId;
-            else
-                this.annotations[key] = typeId;
+            this.annotations[key] = typeId;
         }
         else {
-            let composite: CompositeAnnotation | undefined;
-
-            if (key === ESCAPE_KEY) {
-                const escapedProperty = this.getEscapedProperty();
-                composite = escapedProperty.annotation as CompositeAnnotation | undefined;
-                if (composite === undefined) {
-                    composite = {};
-                    escapedProperty.annotation = composite;
-                }
-            }
-            else {
-                composite = this.annotations[key] as CompositeAnnotation | undefined;
-                if (composite === undefined) {
-                    composite = {};
-                    this.annotations[key] = composite;
-                }
+            let composite = this.annotations[key] as CompositeAnnotation | undefined;
+            if (composite === undefined) {
+                composite = {};
+                this.annotations[key] = composite;
             }
 
             composite[this.compositeIndex] = typeId;
         }
-    }
-
-    private getEscapedProperty(): Partial<EscapedProperty> {
-        return ensureProperty(this.annotations as Record<string, unknown>, ESCAPE_KEY, {}) as Partial<EscapedProperty>;
     }
 
     /** Clears annotations from the object if they are not needed. */
@@ -101,19 +86,23 @@ export abstract class Serializer {
 
         // Explicitly creating the annotations also forces the escape key to be in the first position of each object. This is just a visual thing, but it makes it easier to read the output.
         // If not needed, the annotations will be deleted later.
-        const output: AnnotatedJsonObject = { [ESCAPE_KEY]: {} };
-        this.annotations = output[ESCAPE_KEY]!;
-        let hasEscapedProperty = false;
+        const annotations: Annotations = {};
+        const output: AnnotatedJsonObject = { [ESCAPE_CHAR]: annotations };
+        this.annotations = annotations;
 
-        for (const [ key, item ] of Object.entries(value)) {
+        const keys = Object.keys(value);
+        const length = keys.length;
+        for (let i = 0; i < length; i++) {
+            let key = keys[i];
+            const item = value[key];
+
             validateObjectKey(key);
 
-            if (key === ESCAPE_KEY) {
-                hasEscapedProperty = true;
-                continue;
-            }
+            if (key[0] === ESCAPE_CHAR)
+                key = escapeKey(key);
 
             this.key = key;
+
             this.compositeIndex = undefined;
 
             const serializedItem = this.serializeUnknown(item);
@@ -123,16 +112,6 @@ export abstract class Serializer {
             }
 
             output[key] = serializedItem;
-        }
-
-        // We must serialize this after all other properties because we need a well-defined order of the keys in the object.
-        // Since the escaped property must be stored on the escape key, we must process it either first or last. We decided to do it last because it's easier to implement.
-        if (hasEscapedProperty) {
-            this.key = ESCAPE_KEY;
-            this.compositeIndex = undefined;
-            const serializedItem = this.serializeUnknown(value[ESCAPE_KEY]);
-            if (serializedItem !== undefined)
-                this.getEscapedProperty().value = serializedItem;
         }
 
         this.cleanupAnnotations(output);
@@ -150,8 +129,9 @@ export abstract class Serializer {
     // #region Arrays
 
     serializeArray(value: unknown[]): JsonArray {
-        const output: JsonArray = Array(value.length);
-        for (let i = 0; i < value.length; i++)
+        const length = value.length;
+        const output: JsonArray = Array(length);
+        for (let i = 0; i < length; i++)
             // Arrays must preserve indexes. So, we decided to keep `undefined` as `null`. Also, `JSON.stringify([ undefined ])` returns `[ null ]`.
             output[i] = this.serializeArrayElement(value[i]) ?? null;
 
@@ -259,4 +239,12 @@ export abstract class Serializer {
     }
 
     // #endregion
+}
+
+export function deleteEscapeKeyIfEmpty(value: AnnotatedJsonObject) {
+    // We want to check if the escape key is empty. This should be faster than Object.keys(...).length === 0 because the first operation has to first create an array of all keys.
+    for (const _ in value[ESCAPE_CHAR]!)
+        return;
+
+    delete value[ESCAPE_CHAR];
 }

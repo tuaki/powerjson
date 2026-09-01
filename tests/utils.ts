@@ -1,7 +1,7 @@
 import { expect } from 'bun:test';
 import type { UberJson } from '../src/uberJson.js';
 import type { JsonObject, JsonValue } from '../src/json.js';
-import type { Transformer } from '../src/transformers.js';
+import type { ObjectLike, Transformer } from '../src/transformers.js';
 
 export function wrap(value: JsonValue, annotations?: Record<string, unknown>): JsonObject {
     return {
@@ -45,7 +45,7 @@ export class Tester {
             callback(serializer);
     }
 
-    registerTransformer(transformer: Transformer) {
+    registerTransformer<TObject extends ObjectLike = ObjectLike, TJson extends JsonValue = JsonValue>(transformer: Transformer<TObject, TJson>) {
         for (const serializer of this.serializers)
             serializer.registerTransformer(transformer);
     }
@@ -212,7 +212,7 @@ function visitEntityPaths(
         for (const [ key, child ] of Object.entries(value))
             visitEntityPaths(child, [ ...path, key ], output, objectIsEntity, objectsInPath);
     }
-    else  if (value instanceof Set) {
+    else if (value instanceof Set) {
         let index = 0;
         for (const child of value) {
             visitEntityPaths(child, [ ...path, `${index}` ], output, objectIsEntity, objectsInPath);

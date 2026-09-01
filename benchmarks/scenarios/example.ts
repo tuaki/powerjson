@@ -1,5 +1,5 @@
-import type { Scenario } from '../measure.js';
-import { createRealisticApiCall } from './realisticApiCall.js';
+import type { Scenario } from '../measure.ts';
+import { createRealisticApiCall } from './realisticApiCall.ts';
 
 export function exampleScenario(): Scenario {
     return {

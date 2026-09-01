@@ -1,11 +1,11 @@
-import type { TypeId, JsonObject } from './json.js';
-import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transformer } from './transformers.js';
-import type { Serializer } from './serializer.js';
-import { SimpleSerializer } from './simpleSerializer.js';
-import { DeduplicatedSerializer } from './deduplicatedSerializer.js';
-import type { Deserializer } from './deserializer.js';
-import { SimpleDeserializer } from './simpleDeserializer.js';
-import { DeduplicatedDeserializer } from './deduplicatedDeserializer.js';
+import type { TypeId, JsonObject, JsonValue } from './json.ts';
+import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transformer } from './transformers.ts';
+import type { Serializer } from './serializer.ts';
+import { SimpleSerializer } from './simpleSerializer.ts';
+import { DeduplicatedSerializer } from './deduplicatedSerializer.ts';
+import type { Deserializer } from './deserializer.ts';
+import { SimpleDeserializer } from './simpleDeserializer.ts';
+import { DeduplicatedDeserializer } from './deduplicatedDeserializer.ts';
 
 type AlgorithmConstructor<T> = {
     new (uberJson: UberJson): T;
@@ -58,9 +58,15 @@ export class UberJson {
 
     /**
      * Registers a transformer for a specific type.
-     * Unless override is set to true, it will throw an error if a transformer for the same type or annotation is already registered.
+     * Unless `override` is set to true, it will throw an error if a transformer for the same type or annotation is already registered.
      */
-    registerTransformer(transformer: Transformer, options?: { override?: boolean }): void {
+    registerTransformer<
+        TObject extends ObjectLike = ObjectLike,
+        TJson extends JsonValue = JsonValue,
+    >(
+        transformer: Transformer<TObject, TJson>,
+        options?: { override?: boolean },
+    ): void {
         const prototype = transformer.clazz.prototype;
 
         if (!options?.override) {
@@ -123,7 +129,7 @@ export class UberJson {
         [
             ...Object.values(baseTransformers),
             ...typedArrayTransformers,
-        ].forEach(transformer => this.registerTransformer(transformer));
+        ].forEach(transformer => this.registerTransformer<ObjectLike>(transformer));
     }
 
     private static defaultInstance = new UberJson();

@@ -1,6 +1,6 @@
-import type { JsonArray, JsonMap, JsonObject, JsonValue, TypeId } from './json.js';
-import type { Serializer } from './serializer.js';
-import type { Deserializer } from './deserializer.js';
+import type { JsonArray, JsonMap, JsonObject, JsonValue, TypeId } from './json.ts';
+import type { Serializer } from './serializer.ts';
+import type { Deserializer } from './deserializer.ts';
 
 // Numbers are serialized according to the Section 7.1.12.1 of the [ECMA 262](https://www.ecma-international.org/ecma-262/10.0/index.html) standard with the exception of `-0` (which is converted to "-0"` instead of `"0"`).
 // Additionally, JSON doesn't support strings for numbers, so the four special string values are expressed in their string form (with extra `"`) instead of raw numbers.
@@ -43,30 +43,30 @@ export type Primitive = undefined | null | string | number | boolean | bigint | 
 
 /**
  * In TS, `object` represents any non-primitive type. This means "anything that returns `object` or `function` from `typeof` except `null`".
- * In our case, we don't support functions. So, let's use this types as "`object` without functions".
+ * In our case, we don't support functions. So, let's use this type as "`object` without functions".
  */
 export type ObjectLike = object;
 
-export type Transformer<TObject extends ObjectLike = ObjectLike> = {
+export type Transformer<TObject extends ObjectLike = ObjectLike, TJson extends JsonValue = JsonValue> = {
     clazz: Clazz<TObject>;
     type: TypeId | undefined;
     /**
      * Serializes the value to a JSON value.
      * If undefined is returned, the value will be skipped from objects, sets, and maps. However, it will be kept in arrays as `null` to preserve indexes.
      * Try `JSON.stringify({ a: undefined })` and `JSON.stringify([ undefined ])` to see the difference.
-    */
-    serialize(value: TObject, serializer: Serializer): JsonValue | undefined;
+     */
+    serialize(value: TObject, serializer: Serializer): TJson | undefined;
     /**
-    * Deserializes the value from a JSON value and a type annotation.
-   */
-    deserialize(value: JsonValue, deserializer: Deserializer): TObject;
+     * Deserializes the value from a JSON value and a type annotation.
+     */
+    deserialize(value: TJson, deserializer: Deserializer): TObject;
     /**
-   * Entities are subject to deduplication and circular reference detection. Values are not.
-   */
+     * Entities are subject to deduplication and circular reference detection. Values are not.
+     */
     isEntity: boolean;
     /**
-   * Composite types are serialized as arrays and share one composite annotation. Non-composite types are serialized as objects (and have their own annotations) or primitives.
-   */
+     * Composite types are serialized as arrays and share one composite annotation. Non-composite types are serialized as objects (and have their own annotations) or primitives.
+     */
     isComposite: boolean;
 };
 
@@ -79,7 +79,8 @@ type Clazz<T> = {
     name: string;
 };
 
-export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config: {
+/** Utility function to define transformers as objects. */
+function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config: {
     clazz: Clazz<TObject>;
     type: TypeId | undefined;
     serialize: (value: TObject, serializer: Serializer) => TJson | undefined;

@@ -1,14 +1,11 @@
-import { ESCAPE_KEY, REFERENCE_ANNOTATION, type AnnotatedJsonObject } from './json.js';
-import { Serializer } from './serializer.js';
-import type { ObjectLike } from './transformers.js';
+import { REFERENCE_ANNOTATION } from './json.ts';
+import { deleteEscapeKeyIfEmpty, Serializer } from './serializer.ts';
+import type { ObjectLike } from './transformers.ts';
 
 export class SimpleSerializer extends Serializer {
     // #region Annotations
 
-    protected override cleanupAnnotations(value: AnnotatedJsonObject) {
-        if (Object.keys(value[ESCAPE_KEY]!).length === 0)
-            delete value[ESCAPE_KEY];
-    }
+    protected override cleanupAnnotations = deleteEscapeKeyIfEmpty;
 
     // #endregion
     // #region References

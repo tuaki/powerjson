@@ -1,5 +1,5 @@
-import { createSerializer } from './measure.js';
-import { UberJson } from '../src/uberJson.js';
+import { createSerializer } from './measure.ts';
+import { UberJson } from '../src/uberJson.ts';
 import SuperJson from 'superjson';
 import * as devalue from 'devalue';
 import serializeJavascript from 'serialize-javascript';

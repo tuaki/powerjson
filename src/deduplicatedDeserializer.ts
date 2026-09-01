@@ -1,6 +1,6 @@
-import { Deserializer } from './deserializer.js';
-import { ESCAPE_KEY, REFERENCE_ANNOTATION, type AnnotatedJsonObject, type Annotations, type EscapedProperty, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation } from './json.js';
-import { validateObjectKey, type ObjectLike } from './transformers.js';
+import { Deserializer } from './deserializer.ts';
+import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type AnnotatedJsonObject, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey } from './json.ts';
+import { validateObjectKey, type ObjectLike } from './transformers.ts';
 
 export class DeduplicatedDeserializer extends Deserializer {
     override deserialize(value: AnnotatedJsonObject) {
@@ -98,27 +98,27 @@ const EMPTY_SET_MAX = -1;
 const EMPTY_SET_MIN = Number.MAX_SAFE_INTEGER;
 
 function processObject(value: JsonObject): SortingResult {
-    const annotations = value[ESCAPE_KEY] as Annotations | undefined;
+    const annotations = value[ESCAPE_CHAR] as Annotations | undefined;
     const childResults: SortingResult[] = [];
 
-    for (const [ key, item ] of Object.entries(value)) {
+    const keys = Object.keys(value);
+    const keysLength = keys.length;
+    for (let i = 0; i < keysLength; i++) {
+        let key = keys[i];
+        const item = value[key];
+
         validateObjectKey(key);
 
-        if (key === ESCAPE_KEY)
-            continue;
+        if (key[0] === ESCAPE_CHAR) {
+            if (key === ESCAPE_CHAR)
+                continue;
+
+            key = unescapeKey(key);
+        }
 
         const childResult = processObjectProperty(item, annotations?.[key]);
         if (childResult !== undefined)
             childResults.push(childResult);
-    }
-
-    const escapedProperty = annotations?.[ESCAPE_KEY] as EscapedProperty | undefined;
-    if (escapedProperty) {
-        // This result will be checked later just like all the other children results, with the exception that we will have to remove it before the key assignment.
-        // We technically don't need to do the "<" check because it is guaranteed by the fact that the escaped property is always serialized last. But we have to do all other checks so it's easier this way.
-        const escapedChildResult = processObjectProperty(escapedProperty.value, escapedProperty.annotation);
-        if (escapedChildResult !== undefined)
-            childResults.push(escapedChildResult);
     }
 
     // The happy path - all children are in a valid order, no need to sort them.
@@ -134,7 +134,10 @@ function processObject(value: JsonObject): SortingResult {
     let minId = EMPTY_SET_MIN;
     let maxRef = EMPTY_SET_MAX;
 
-    for (const childResult of childResults) {
+    const resultsLength = childResults.length;
+    for (let i = 0; i < resultsLength; i++) {
+        const childResult = childResults[i];
+
         minId = Math.min(minId, childResult.minId);
         maxRef = Math.max(maxRef, childResult.maxRef);
     }
@@ -184,7 +187,8 @@ function processArray(value: JsonArray, compositeIterator: CompositeAnnotationIt
     let maxRef = EMPTY_SET_MAX;
     let copiedArray: JsonArray | undefined;
 
-    for (let i = 0; i < value.length; i++) {
+    const length = value.length;
+    for (let i = 0; i < length; i++) {
         const annotation = compositeIterator?.next();
         const item = value[i];
 
@@ -245,7 +249,10 @@ function checkObjectKeyOrder(childResults: SortingResult[]): SortingResult | und
     let minId = EMPTY_SET_MIN;
     let maxRef = EMPTY_SET_MAX;
 
-    for (const childResult of childResults) {
+    const length = childResults.length;
+    for (let i = 0; i < length; i++) {
+        const childResult = childResults[i];
+
         // A new value was created for a child - something was out of order - the whole thing probably needs to be sorted.
         if (childResult.sortedEntity !== undefined)
             return undefined;
@@ -272,8 +279,13 @@ function sortObjectKeys(value: JsonObject, annotations: Annotations | undefined,
     // Let's start by adding keys to the properties so that we can sort them.
     let i = 0;
 
-    for (const [ key, item ] of Object.entries(value)) {
-        if (key === ESCAPE_KEY)
+    const keys = Object.keys(value);
+    const keysLength = keys.length;
+    for (let j = 0; j < keysLength; j++) {
+        const key = keys[j];
+        const item = value[key];
+
+        if (key === ESCAPE_CHAR)
             continue;
 
         // Only references and non-primitives were included in the childResults.
@@ -287,28 +299,15 @@ function sortObjectKeys(value: JsonObject, annotations: Annotations | undefined,
         }
     }
 
-    if (i !== childResults.length) {
-        // We iterated over all keys except the escaped one. If the lengths don't match, this means the escaped property's result is also in the childResults. Let's remove it.
-        const escapedChildResult = childResults.pop()!;
-
-        if (escapedChildResult.sortedEntity !== undefined) {
-            const escapedProperty = annotations![ESCAPE_KEY] as EscapedProperty;
-            // Again, no modifications to the original data, we need to copy the annotations object as well.
-            annotations = { ...annotations };
-            annotations[ESCAPE_KEY] = {
-                value: escapedChildResult.sortedEntity,
-                annotation: escapedProperty.annotation,
-            };
-        }
-    }
-
     if (annotations !== undefined)
-        sortedEntity[ESCAPE_KEY] = annotations;
+        sortedEntity[ESCAPE_CHAR] = annotations;
 
     // Finally, we can sort the properties and add them to the final object.
     childResults.sort(compareSortingResults);
 
-    for (const childResult of childResults) {
+    const resultsLength = childResults.length;
+    for (let i = 0; i < resultsLength; i++) {
+        const childResult = childResults[i];
         // All keys have to be defined at this point.
         const key = childResult.key!;
         sortedEntity[key] = childResult.sortedEntity ?? value[key];

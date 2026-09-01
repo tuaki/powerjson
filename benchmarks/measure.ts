@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
-import { BENCHMARK_ITERATIONS_SCALE, BENCHMARK_SEED, DISPLAY_ERROR_STACKS, DISPLAY_VERBOSE_RESULTS } from './config.js';
-import { selectUnit, type Unit } from './utils.js';
+import Table from 'cli-table3';
+import { BENCHMARK_ITERATIONS_SCALE, BENCHMARK_SEED, DISPLAY_ERROR_STACKS, DISPLAY_VERBOSE_RESULTS } from './config.ts';
+import { selectUnit, type Unit } from './utils.ts';
 
 const WARMUP_ITERATIONS_RATIO = 0.1;
 
@@ -317,36 +318,57 @@ function printScenarioResults(result: ScenarioResult, serializers: Serializer[])
     ]));
     const sizeUnit = selectUnit('size', result.results.map(result => result.stringSizeBytes));
 
-    console.table(serializers.map(serializer => mapSerializerResultToTableRow(serializer, result.results, timeUnit, sizeUnit)));
+    const table = new Table({
+        head: [
+            'serializer',
+            'serialize',
+            'toJson',
+            'deserialize',
+            'fromJson',
+            'stringify',
+            'parse',
+            `total (${timeUnit.label})`,
+            `size (${sizeUnit.label})`,
+        ],
+        style: {
+            head: [ 'white', 'bold' ],
+            border: [ 'white' ],
+        },
+    });
+
+    table.push(...serializers.map(serializer => mapSerializerResultToTableRow(serializer, result.results, timeUnit, sizeUnit)));
+
+    process.stdout.write(table.toString());
+    process.stdout.write('\n');
 }
 
 function mapSerializerResultToTableRow(serializer: Serializer, results: SerializerResult[], timeUnit: Unit, sizeUnit: Unit) {
     const result = results.find(r => r.serializer === serializer.name);
     if (!result) {
-        return {
-            serializer: serializer.name,
-            serialize: '-',
-            toJson: '-',
-            deserialize: '-',
-            fromJson: '-',
-            stringify: '-',
-            parse: '-',
-            [`total (${timeUnit.label})`]: '-',
-            [`size (${sizeUnit.label})`]: '-',
-        };
+        return [
+            serializer.name,
+            '-',
+            '-',
+            '-',
+            '-',
+            '-',
+            '-',
+            '-',
+            '-',
+        ];
     }
 
     const totalMs = result.stringifyMs + result.parseMs;
 
-    return {
-        serializer: result.serializer,
-        serialize: timeUnit.format(result.serializeMs),
-        toJson: timeUnit.format(result.toJsonMs),
-        deserialize: timeUnit.format(result.deserializeMs),
-        fromJson: timeUnit.format(result.fromJsonMs),
-        stringify: timeUnit.format(result.stringifyMs),
-        parse: timeUnit.format(result.parseMs),
-        [`total (${timeUnit.label})`]: timeUnit.format(totalMs),
-        [`size (${sizeUnit.label})`]: sizeUnit.format(result.stringSizeBytes),
-    };
+    return [
+        result.serializer,
+        timeUnit.format(result.serializeMs),
+        timeUnit.format(result.toJsonMs),
+        timeUnit.format(result.deserializeMs),
+        timeUnit.format(result.fromJsonMs),
+        timeUnit.format(result.stringifyMs),
+        timeUnit.format(result.parseMs),
+        timeUnit.format(totalMs),
+        sizeUnit.format(result.stringSizeBytes),
+    ];
 }

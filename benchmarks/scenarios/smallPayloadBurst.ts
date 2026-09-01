@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { Scenario } from '../measure.js';
+import type { Scenario } from '../measure.ts';
 
 export function smallPayloadBurstScenario(): Scenario {
     return {
@@ -7,7 +7,10 @@ export function smallPayloadBurstScenario(): Scenario {
         name: 'Small Payload Burst',
         description: 'Many small realistic event payloads, measured as repeated per-item serialization and parsing.',
         iterations: 100,
+        batches: 5,
         getData: createSmallPayloadBursts,
+        // Too slow.
+        skipSerializers: [ 'next-json' ],
     };
 }
 

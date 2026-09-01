@@ -1,6 +1,6 @@
-import { Deserializer } from './deserializer.js';
-import type { Annotation, EntityId, TypeId } from './json.js';
-import type { ObjectLike } from './transformers.js';
+import { Deserializer } from './deserializer.ts';
+import type { Annotation, EntityId, TypeId } from './json.ts';
+import type { ObjectLike } from './transformers.ts';
 
 export class SimpleDeserializer extends Deserializer {
     // #region Annotations
