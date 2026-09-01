@@ -1,18 +1,18 @@
 import { faker } from '@faker-js/faker';
 import type { Scenario } from '../measure.js';
 
-export function sharedReferenceScenario(): Scenario {
+export function sharedReferencesScenario(): Scenario {
     return {
-        id: 'shared-reference',
-        name: 'Shared Reference',
+        id: 'shared-references',
+        name: 'Shared References',
         description: 'A JSON-compatible graph with many repeated object and array references but no cycles.',
         iterations: 200,
         batches: 10,
-        getData: createSharedReferenceGraph,
+        getData: createSharedReferencesGraph,
     };
 }
 
-type SharedReferenceGraph = {
+type SharedReferencesGraph = {
     records: {
         id: string;
         sharedProfile: Profile;
@@ -34,7 +34,7 @@ type Profile = {
     lastActiveAt: Date;
 };
 
-function createSharedReferenceGraph(): SharedReferenceGraph {
+function createSharedReferencesGraph(): SharedReferencesGraph {
     const sharedProfile = {
         id: faker.string.uuid(),
         name: faker.person.fullName(),

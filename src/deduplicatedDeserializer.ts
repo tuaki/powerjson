@@ -51,7 +51,7 @@ export class DeduplicatedDeserializer extends Deserializer {
     protected override getReference(entityId: EntityId) {
         const value = this.referencedEntities.get(entityId);
         if (value === undefined)
-            throw new Error(`Reference not found: ${entityId}`);
+            throw new Error(`Reference not found: ${entityId}. Try setting the "sortObjectKeys" option to true.`);
 
         return value;
     }

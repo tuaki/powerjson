@@ -35,7 +35,7 @@ export function deserializeNumber(value: string): number {
         case NEGATIVE_ZERO:
             return -0;
         default:
-            throw new Error(`Invalid number value: ${value}`);
+            throw new Error(`Invalid number value: ${value}.`);
     }
 }
 
@@ -126,7 +126,6 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
     const prototype = Object.getPrototypeOf(value);
     return prototype === Object.prototype || prototype === null;
 }
-
 
 const arrayTransformer = transformer({
     clazz: Array,

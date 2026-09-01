@@ -6,18 +6,25 @@ const WARMUP_ITERATIONS_RATIO = 0.1;
 
 type InputValue = unknown;
 
-type Serializer<TSerialized = unknown> = {
+type SimpleSerializer = {
     name: string;
-    serialize(value: InputValue): TSerialized;
-    deserialize(value: TSerialized): InputValue;
-    toJson(value: TSerialized): string;
-    fromJson(text: string): TSerialized;
+    stringify(value: InputValue): string;
+    parse(json: string): InputValue;
 };
 
-export function createSerializer<TSerialized>(
+type ComplexSerializer<TSerialized> = SimpleSerializer & {
+    serialize(value: InputValue): TSerialized;
+    deserialize(serialized: TSerialized): InputValue;
+    toJson(serialized: TSerialized): string;
+    fromJson(json: string): TSerialized;
+};
+
+type Serializer<TSerializer = unknown> = SimpleSerializer | ComplexSerializer<TSerializer>;
+
+export function createSerializer<TSerializer = unknown>(
     name: string,
-    serializer: Omit<Serializer<TSerialized>, 'name'>,
-): Serializer<TSerialized> {
+    serializer: Omit<SimpleSerializer, 'name'> | Omit<ComplexSerializer<TSerializer>, 'name'>,
+): Serializer<TSerializer> {
     return {
         name,
         ...serializer,
@@ -99,6 +106,8 @@ function runScenario(scenario: Scenario, serializers: Serializer[]): ScenarioRes
             toJsonMs: averageByKey(serializerResults, 'toJsonMs'),
             deserializeMs: averageByKey(serializerResults, 'deserializeMs'),
             fromJsonMs: averageByKey(serializerResults, 'fromJsonMs'),
+            stringifyMs: averageByKey(serializerResults, 'stringifyMs'),
+            parseMs: averageByKey(serializerResults, 'parseMs'),
             stringSizeBytes: averageByKey(serializerResults, 'stringSizeBytes'),
         };
 
@@ -142,6 +151,8 @@ export type SerializerResult = {
     toJsonMs: number;
     deserializeMs: number;
     fromJsonMs: number;
+    stringifyMs: number;
+    parseMs: number;
     stringSizeBytes: number;
 };
 
@@ -165,23 +176,39 @@ function measureSerializer(scenarioName: string, serializer: Serializer, items: 
         deserializeMs: NaN,
         toJsonMs: NaN,
         fromJsonMs: NaN,
+        stringifyMs: NaN,
+        parseMs: NaN,
         stringSizeBytes: NaN,
     };
 
     try {
-        const [ serializeMs, serialized ] = measureFunction(testItems, value => serializer.serialize(value));
-        result.serializeMs = serializeMs;
+        if ('serialize' in serializer) {
+            const [ serializeMs, serialized ] = measureFunction(testItems, value => serializer.serialize(value));
+            result.serializeMs = serializeMs;
 
-        const [ toJsonMs, json ] = measureFunction(serialized, value => serializer.toJson(value));
-        result.toJsonMs = toJsonMs;
+            const [ toJsonMs, json ] = measureFunction(serialized, value => serializer.toJson(value));
+            result.toJsonMs = toJsonMs;
 
-        result.stringSizeBytes = sumSizeBytes(json) / json.length;
+            result.stringSizeBytes = sumSizeBytes(json) / json.length;
 
-        const [ fromJsonMs, reserialized ] = measureFunction(json, value => serializer.fromJson(value));
-        result.fromJsonMs = fromJsonMs;
+            const [ fromJsonMs, reserialized ] = measureFunction(json, value => serializer.fromJson(value));
+            result.fromJsonMs = fromJsonMs;
 
-        const [ deserializeMs ] = measureFunction(reserialized, value => serializer.deserialize(value));
-        result.deserializeMs = deserializeMs;
+            const [ deserializeMs ] = measureFunction(reserialized, value => serializer.deserialize(value));
+            result.deserializeMs = deserializeMs;
+
+            result.stringifyMs = result.serializeMs + result.toJsonMs;
+            result.parseMs = result.deserializeMs + result.fromJsonMs;
+        }
+        else {
+            const [ stringifyMs, json ] = measureFunction(testItems, value => serializer.stringify(value));
+            result.stringifyMs = stringifyMs;
+
+            result.stringSizeBytes = sumSizeBytes(json) / json.length;
+
+            const [ parseMs ] = measureFunction(json, value => serializer.parse(value));
+            result.parseMs = parseMs;
+        }
     }
     catch (error) {
         printError(`Error measuring serializer '${serializer.name}' for scenario '${scenarioName}'.`, error, true);
@@ -192,11 +219,19 @@ function measureSerializer(scenarioName: string, serializer: Serializer, items: 
 
 function warmUpSerializer(serializer: Serializer, items: InputValue[] | InputValue[][]) {
     const elements = items.flatMap(item => Array.isArray(item) ? item : [ item ]);
-    for (const element of elements) {
-        const serialized = serializer.serialize(element);
-        const json = serializer.toJson(serialized);
-        const reserialized = serializer.fromJson(json);
-        serializer.deserialize(reserialized);
+    if ('serialize' in serializer) {
+        for (const element of elements) {
+            const serialized = serializer.serialize(element);
+            const json = serializer.toJson(serialized);
+            const reserialized = serializer.fromJson(json);
+            serializer.deserialize(reserialized);
+        }
+    }
+    else {
+        for (const element of elements) {
+            const json = serializer.stringify(element);
+            serializer.parse(json);
+        }
     }
 }
 
@@ -262,9 +297,9 @@ function getUtf8ByteLength(value: string): number {
 const seenErrors = new Set<string>();
 
 function printError(message: string, error: unknown, onlyUnique = false) {
-    if (onlyUnique && seenErrors.has(message)) 
+    if (onlyUnique && seenErrors.has(message))
         return;
-    
+
     seenErrors.add(message);
 
     if (DISPLAY_ERROR_STACKS)
@@ -301,9 +336,7 @@ function mapSerializerResultToTableRow(serializer: Serializer, results: Serializ
         };
     }
 
-    const stringifyMs = result.serializeMs + result.toJsonMs;
-    const parseMs = result.deserializeMs + result.fromJsonMs;
-    const totalMs = stringifyMs + parseMs;
+    const totalMs = result.stringifyMs + result.parseMs;
 
     return {
         serializer: result.serializer,
@@ -311,8 +344,8 @@ function mapSerializerResultToTableRow(serializer: Serializer, results: Serializ
         toJson: timeUnit.format(result.toJsonMs),
         deserialize: timeUnit.format(result.deserializeMs),
         fromJson: timeUnit.format(result.fromJsonMs),
-        stringify: timeUnit.format(stringifyMs),
-        parse: timeUnit.format(parseMs),
+        stringify: timeUnit.format(result.stringifyMs),
+        parse: timeUnit.format(result.parseMs),
         [`total (${timeUnit.label})`]: timeUnit.format(totalMs),
         [`size (${sizeUnit.label})`]: sizeUnit.format(result.stringSizeBytes),
     };

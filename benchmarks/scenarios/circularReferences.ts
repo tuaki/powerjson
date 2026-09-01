@@ -1,14 +1,14 @@
 import type { Scenario } from '../measure.js';
 
-export function circularReferenceScenario(): Scenario {
+export function circularReferencesScenario(): Scenario {
     return {
-        id: 'circular-reference',
-        name: 'Circular Reference',
+        id: 'circular-references',
+        name: 'Circular References',
         description: 'A cyclic object graph with arrays, sets, and maps referencing each other.',
-        skipSerializers: [ 'JSON', 'uberjson', 'superjson' ],
+        skipSerializers: [ 'JSON' ],
         iterations: 100,
         batches: 100,
-        getData: createCircularReference,
+        getData: createCircularReferences,
     };
 }
 
@@ -16,7 +16,7 @@ type CircularReference = {
     root: Record<string, unknown>;
 };
 
-function createCircularReference(): CircularReference {
+function createCircularReferences(): CircularReference {
     const root: Record<string, unknown> = { name: 'root' };
 
     const nodeA: Record<string, unknown> = { name: 'node-a', root };

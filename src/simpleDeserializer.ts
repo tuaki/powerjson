@@ -28,7 +28,7 @@ export class SimpleDeserializer extends Deserializer {
         // A reference is just an index from the output root.
         const entity = this.pathEntities[entityId];
         if (entity === undefined)
-            throw new Error(`Reference not found: ${entityId}`);
+            throw new Error(`Reference not found: ${entityId}.`);
 
         return entity;
     }

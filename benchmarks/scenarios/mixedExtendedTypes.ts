@@ -16,7 +16,6 @@ export function mixedExtendedTypesScenario(): Scenario {
 // Typed arrays are fundamentally broken in superJson, so we don't include them in the benchmark.
 // They would singlehandedly skew the results and make it impossible to compare the other types in a meaningful way.
 
-
 type MixedExtendedTypes = {
     generatedAt: Date;
     lookup: Map<string, Set<number>>;

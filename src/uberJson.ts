@@ -39,9 +39,9 @@ export class UberJson {
         return serializer.serialize(value);
     }
 
-    deserialize(jsonValue: JsonObject) {
+    deserialize<T = unknown>(jsonValue: JsonObject): T {
         const deserializer = new this.deserializerConstructor(this);
-        return deserializer.deserialize(jsonValue);
+        return deserializer.deserialize(jsonValue) as T;
     }
 
     stringify(value: unknown, space?: string | number): string {
@@ -114,7 +114,7 @@ export class UberJson {
     getTransformerForType(typeId: TypeId): Transformer {
         const transformer = this.transformersByType.get(typeId);
         if (!transformer)
-            throw new Error(`No transformer found for type: ${typeId}`);
+            throw new Error(`No transformer found for type: ${typeId}.`);
 
         return transformer;
     }
