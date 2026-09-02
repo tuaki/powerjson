@@ -25,6 +25,7 @@ const jsonString = UberJson.stringify(data, 4);
 /*
 {
     "$": {
+        "$": 1,
         "a": "number",
         "b": "Date",
         "c": {
@@ -57,7 +58,7 @@ We try to keep the configuration minimal. However, in some use cases, these opti
 - `deduplicate` (default: `false`) - see the [Referential equality](./docs/advanced-topics.md#referential-equality) section for details.
 - `sortObjectKeys` (default: `false`) - see the [Object key order](./docs/advanced-topics.md#object-key-order) section for details.
 
-The default `UberJson` instance is immutable, but you can create a new instance with different configuration options:
+The default `UberJson` instance is immutable; you are supposed to create a new instance with custom configuration:
 
 ```ts
 const uberJson = new UberJson({ deduplicate: true });
@@ -95,7 +96,9 @@ These types are supported by UberJson (so far). More types will be added as they
 Any object with an unsupported type will be serialized as a plain JS object. You can change that by registering a custom transformer for your class. For example, transformer for Luxon's `DateTime` might look like this:
 
 ```ts
-UberJson.registerTransformer({
+import { UberJson, transformer } from 'uberjson';
+
+const dateTimeTransformer = transformer({
     clazz: DateTime,
     type: 'DateTime',
     serialize: value => value.toISO()!,
@@ -103,6 +106,8 @@ UberJson.registerTransformer({
     isEntity: false,    // Referential equalities won't be preserved for this type (in the deduplication mode).
     isComposite: false, // The type won't be serialized to an array (or, if it will, it won't use type annotations for its properties).
 });
+
+const uberJson = new UberJson({ transformers: [ dateTimeTransformer ] });
 ```
 
 See [custom tests](./tests/custom.test.ts) for more examples.

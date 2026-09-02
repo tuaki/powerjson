@@ -1,15 +1,17 @@
-import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type TypeId } from './json.ts';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
 import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike } from './transformers.ts';
 import type { UberJson } from './uberJson.ts';
 
 export abstract class Serializer {
     readonly uberJson: UberJson;
+    readonly version: number;
 
-    constructor(uberJson: UberJson) {
+    constructor(uberJson: UberJson, version: number) {
         this.uberJson = uberJson;
+        this.version = version;
     }
 
-    serialize(value: unknown): JsonObject {
+    serialize(value: unknown): RootJsonObject {
         // If the top-level value isn't a plain object, we have to wrap it so that it can put its annotations somewhere.
         const isWrapped = !isPlainObject(value);
 
@@ -17,17 +19,17 @@ export abstract class Serializer {
         this.trySetReference(input);
         const serialized = this.serializePlainObject(input);
 
-        if (isWrapped) {
-            let annotations = serialized[ESCAPE_CHAR];
-            if (annotations === undefined) {
-                annotations = {};
-                serialized[ESCAPE_CHAR] = annotations;
-            }
-
-            annotations[ESCAPE_CHAR] = WRAPPED_DIRECTIVE;
+        let annotations = serialized[ESCAPE_CHAR];
+        if (annotations === undefined) {
+            annotations = {};
+            serialized[ESCAPE_CHAR] = annotations;
         }
+        annotations[ESCAPE_CHAR] = this.version;
 
-        return serialized;
+        if (isWrapped)
+            (annotations as RootAnnotations)[WRAPPED_DIRECTIVE] = true;
+
+        return serialized as RootJsonObject;
     }
 
     // #region Context

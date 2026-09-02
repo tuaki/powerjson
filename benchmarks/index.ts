@@ -23,7 +23,7 @@ function main() {
 
 function createScenarios(): Scenario[] {
     return [
-        // exampleScenario(),
+        exampleScenario(),
 
         realisticApiCallScenario(), // Already better
 
@@ -34,7 +34,7 @@ function createScenarios(): Scenario[] {
         // Their serializer caches transformed results for all objects it sees. If it sees the same object again, it will either return a reference (if `dedupe: true`) or the cached result.
         // However, if `dedupe: false`, serialization depends on the path to the object - because the path is used to break cycles. So, an object like `a: { b: { c: a } }` should break the cycle when encountering `a` for the second time, while the same cycle but starting from `b` should break the cycle at `b`.
         // UberJson always expands the objects as deep as possible, which results in an exponential growth on this specific scenario. Nevertheless, this is a very artificial scenario. In this case, the only reasonable way is to deduplicate - in which case, unfortunately, superJson throws an error.
-        // circularReferencesScenario(),
+        circularReferencesScenario(),
 
         repeatedTemporalValuesScenario(),
         mixedExtendedTypesScenario(),
@@ -43,29 +43,28 @@ function createScenarios(): Scenario[] {
 
 function createSerializers() {
     return [
-        // jsonSerializer(),
+        jsonSerializer(),
 
         uberJsonSerializer({ deduplicate: false }),
         uberJsonSerializer({ deduplicate: true }),
 
-        // superJsonSerializer({ dedupe: false }),
-        // superJsonSerializer({ dedupe: true }),
+        superJsonSerializer({ dedupe: false }),
+        superJsonSerializer({ dedupe: true }),
 
         devalueSerializer(),
 
-        // serializeJavascriptSerializer(),
+        serializeJavascriptSerializer(),
 
-        // nextJsonSerializer(),
+        nextJsonSerializer(),
     ];
 }
 
 const comparisonGroups: ComparisonGroup[] = [ {
-//     serializers: [ 'uberjson-simple', 'superjson-default' ],
-// }, {
-//     serializers: [ 'uberjson-deduplicate', 'superjson-dedupe' ],
-// }, {
-    // serializers: [ 'uberjson-simple', 'uberjson-deduplicate', 'superjson-default', 'superjson-dedupe', 'devalue', 'serialize-javascript', 'next-json' ],
-    serializers: [ 'uberjson-simple', 'uberjson-deduplicate', 'devalue' ],
+    serializers: [ 'uberjson-simple', 'superjson-default' ],
+}, {
+    serializers: [ 'uberjson-deduplicate', 'superjson-dedupe' ],
+}, {
+    serializers: [ 'uberjson-simple', 'uberjson-deduplicate', 'superjson-default', 'superjson-dedupe', 'devalue', 'serialize-javascript', 'next-json' ],
 } ];
 
 const comparisonMetrics: ComparisonMetric[] = [ {

@@ -1,4 +1,4 @@
-import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type TypeId } from './json.ts';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type RootJsonObject, type TypeId } from './json.ts';
 import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.ts';
 import type { UberJson } from './uberJson.ts';
 
@@ -9,8 +9,9 @@ export abstract class Deserializer {
         this.uberJson = uberJson;
     }
 
-    deserialize(value: AnnotatedJsonObject): unknown {
-        const isWrapped = value[ESCAPE_CHAR]?.[ESCAPE_CHAR] === WRAPPED_DIRECTIVE;
+    deserialize(value: RootJsonObject): unknown {
+        const annotations = value[ESCAPE_CHAR];
+        const isWrapped = annotations[WRAPPED_DIRECTIVE] === true && value[WRAPPED_DIRECTIVE] === undefined;
 
         const deserialized = this.deserializePlainObject(value);
 
@@ -19,7 +20,7 @@ export abstract class Deserializer {
 
     // #region Context
 
-    protected annotation: Annotation | CompositeAnnotation | undefined;
+    protected annotation: Annotations[string] | undefined;
     protected compositeIndex: number | undefined;
 
     // #endregion

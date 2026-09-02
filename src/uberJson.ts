@@ -1,47 +1,52 @@
-import type { TypeId, JsonObject, JsonValue } from './json.ts';
+import { type TypeId, type JsonObject, ESCAPE_CHAR, type RootJsonObject } from './json.ts';
 import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transformer } from './transformers.ts';
-import type { Serializer } from './serializer.ts';
 import { SimpleSerializer } from './simpleSerializer.ts';
 import { DeduplicatedSerializer } from './deduplicatedSerializer.ts';
-import type { Deserializer } from './deserializer.ts';
 import { SimpleDeserializer } from './simpleDeserializer.ts';
-import { DeduplicatedDeserializer } from './deduplicatedDeserializer.ts';
+import { DeduplicatedDeserializer, type SortKeysOption } from './deduplicatedDeserializer.ts';
 
-type AlgorithmConstructor<T> = {
-    new (uberJson: UberJson): T;
+type UberJsonConfig = {
+    deduplicate?: boolean;
+    sortObjectKeys?: SortKeysOption;
+    transformers?: Transformer[];
 };
 
 export class UberJson {
     readonly deduplicate: boolean;
-    readonly sortObjectKeys: boolean;
-
-    readonly serializerConstructor: AlgorithmConstructor<Serializer>;
-    readonly deserializerConstructor: AlgorithmConstructor<Deserializer>;
+    readonly sortObjectKeys: SortKeysOption;
 
     constructor({
         deduplicate = false,
-        sortObjectKeys = false,
-    }: {
-        deduplicate?: boolean;
-        sortObjectKeys?: boolean;
-    } = {}) {
+        sortObjectKeys = 'catch',
+        transformers = [],
+    }: UberJsonConfig = {}) {
         this.deduplicate = deduplicate;
         this.sortObjectKeys = sortObjectKeys;
 
-        this.serializerConstructor = deduplicate ? DeduplicatedSerializer : SimpleSerializer;
-        this.deserializerConstructor = deduplicate ? DeduplicatedDeserializer : SimpleDeserializer;
-
-        this.addTransformers();
+        [
+            ...Object.values(baseTransformers),
+            ...typedArrayTransformers,
+            ...transformers,
+        ].forEach(transformer => this.registerTransformer(transformer));
     }
 
     serialize(value: unknown): JsonObject {
-        const serializer = new this.serializerConstructor(this);
+        const serializer = this.deduplicate
+            ? new DeduplicatedSerializer(this, 2)
+            : new SimpleSerializer(this, 1);
+
         return serializer.serialize(value);
     }
 
     deserialize<T = unknown>(jsonValue: JsonObject): T {
-        const deserializer = new this.deserializerConstructor(this);
-        return deserializer.deserialize(jsonValue) as T;
+        const value = jsonValue as RootJsonObject;
+        const version = value[ESCAPE_CHAR][ESCAPE_CHAR];
+
+        const deserializer = version === 2
+            ? new DeduplicatedDeserializer(this)
+            : new SimpleDeserializer(this);
+
+        return deserializer.deserialize(value) as T;
     }
 
     stringify(value: unknown, space?: string | number): string {
@@ -56,32 +61,10 @@ export class UberJson {
     private readonly transformersByPrototype: Map<ObjectLike, Transformer> = new Map();
     private readonly transformersByType: Map<string, Transformer> = new Map();
 
-    /**
-     * Registers a transformer for a specific type.
-     * Unless `override` is set to true, it will throw an error if a transformer for the same type or annotation is already registered.
-     */
-    registerTransformer<
-        TObject extends ObjectLike = ObjectLike,
-        TJson extends JsonValue = JsonValue,
-    >(
-        transformer: Transformer<TObject, TJson>,
-        options?: { override?: boolean },
-    ): void {
+    private registerTransformer(transformer: Transformer): void {
         const prototype = transformer.clazz.prototype;
-
-        if (!options?.override) {
-            const existingByPrototype = this.transformersByPrototype.get(prototype);
-            if (existingByPrototype !== undefined)
-                throw new Error(`Transformer for class "${transformer.clazz.name}" is already registered with type "${existingByPrototype.type}".`);
-
-            if (transformer.type !== undefined) {
-                const existingByType = this.transformersByType.get(transformer.type);
-                if (existingByType !== undefined)
-                    throw new Error(`Transformer for type "${transformer.type}" is already registered with class "${existingByType.clazz.name}".`);
-            }
-        }
-
         this.transformersByPrototype.set(prototype, transformer);
+
         if (transformer.type !== undefined)
             this.transformersByType.set(transformer.type, transformer);
     }
@@ -125,18 +108,10 @@ export class UberJson {
         return transformer;
     }
 
-    private addTransformers() {
-        [
-            ...Object.values(baseTransformers),
-            ...typedArrayTransformers,
-        ].forEach(transformer => this.registerTransformer<ObjectLike>(transformer));
-    }
-
     private static defaultInstance = new UberJson();
 
     static serialize = UberJson.defaultInstance.serialize.bind(UberJson.defaultInstance);
     static deserialize = UberJson.defaultInstance.deserialize.bind(UberJson.defaultInstance);
     static stringify = UberJson.defaultInstance.stringify.bind(UberJson.defaultInstance);
     static parse = UberJson.defaultInstance.parse.bind(UberJson.defaultInstance);
-    static registerTransformer = UberJson.defaultInstance.registerTransformer.bind(UberJson.defaultInstance);
 }

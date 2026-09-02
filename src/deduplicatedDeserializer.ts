@@ -1,11 +1,30 @@
 import { Deserializer } from './deserializer.ts';
-import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type AnnotatedJsonObject, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey } from './json.ts';
+import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey, type RootJsonObject } from './json.ts';
 import { validateObjectKey, type ObjectLike } from './transformers.ts';
 
+export type SortKeysOption = 'always' | 'catch' | 'never';
+
 export class DeduplicatedDeserializer extends Deserializer {
-    override deserialize(value: AnnotatedJsonObject) {
-        if (this.uberJson.sortObjectKeys)
-            value = checkOrSortObjectKeys(value);
+    private sortObjectKeys!: SortKeysOption;
+
+    override deserialize(value: RootJsonObject) {
+        this.sortObjectKeys = this.uberJson.sortObjectKeys;
+
+        if (this.sortObjectKeys === 'catch') {
+            try {
+                return super.deserialize(value);
+            }
+            catch (error) {
+                if (error !== expectedReferenceError)
+                    throw error;
+
+                // Try again, but this time with sorting enabled.
+                this.sortObjectKeys = 'always';
+            }
+        }
+
+        if (this.sortObjectKeys === 'always')
+            value = checkOrSortObjectKeys(value) as RootJsonObject;
 
         return super.deserialize(value);
     }
@@ -50,14 +69,25 @@ export class DeduplicatedDeserializer extends Deserializer {
 
     protected override getReference(entityId: EntityId) {
         const value = this.referencedEntities.get(entityId);
-        if (value === undefined)
-            throw new Error(`Reference not found: ${entityId}. Try setting the "sortObjectKeys" option to true.`);
+        if (value === undefined) {
+            switch (this.sortObjectKeys) {
+                case 'catch':
+                    // No need to create a dedicated error instance - we will catch it anyway.
+                    throw expectedReferenceError;
+                case 'always':
+                    throw new Error(`Reference not found: ${entityId}.`);
+                case 'never':
+                    throw new Error(`Reference not found: ${entityId}. Try changing the "sortObjectKeys" option.`);
+            }
+        }
 
         return value;
     }
 
     // #endregion
 }
+
+const expectedReferenceError = Symbol('ExpectedReferenceError');
 
 function checkOrSortObjectKeys(value: JsonObject): JsonObject {
     return processObject(value).sortedEntity as JsonObject | undefined ?? value;
@@ -150,7 +180,7 @@ function processObject(value: JsonObject): SortingResult {
 }
 
 /** @returns undefined if the property doesn't affect the sorting order, SortingResult otherwise. */
-function processObjectProperty(value: JsonValue, annotationOrComposite: Annotation | CompositeAnnotation | undefined): SortingResult | undefined {
+function processObjectProperty(value: JsonValue, annotationOrComposite: Annotations[string] | undefined): SortingResult | undefined {
     // References are trivial and primitives don't matter for anything.
     if (annotationOrComposite === REFERENCE_ANNOTATION)
         return { minId: EMPTY_SET_MIN, maxRef: value as EntityId };

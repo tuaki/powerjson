@@ -1,4 +1,4 @@
-import type { JsonArray, JsonMap, JsonObject, JsonValue, TypeId } from './json.ts';
+import type { JsonValue, TypeId } from './json.ts';
 import type { Serializer } from './serializer.ts';
 import type { Deserializer } from './deserializer.ts';
 
@@ -79,15 +79,15 @@ type Clazz<T> = {
     name: string;
 };
 
-/** Utility function to define transformers as objects. */
-function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config: {
+/** Utility function for defining transformers. */
+export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config: {
     clazz: Clazz<TObject>;
     type: TypeId | undefined;
     serialize: (value: TObject, serializer: Serializer) => TJson | undefined;
     deserialize: (value: TJson, deserializer: Deserializer) => TObject;
     isEntity?: boolean;
     isComposite?: boolean;
-}): Transformer<TObject> {
+}): Transformer<TObject, TJson> {
     return {
         isEntity: false,
         isComposite: false,
@@ -106,8 +106,8 @@ function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config
 const plainObjectTransformer = transformer({
     clazz: Object as unknown as Clazz<Record<string, unknown>>,
     type: undefined,
-    serialize: (value: Record<string, unknown>, serializer: Serializer) => serializer.serializePlainObject(value),
-    deserialize: (value: JsonObject, deserializer: Deserializer) => deserializer.deserializePlainObject(value),
+    serialize: (value, serializer) => serializer.serializePlainObject(value),
+    deserialize: (value, deserializer) => deserializer.deserializePlainObject(value),
     isEntity: true,
 });
 
@@ -131,8 +131,8 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 const arrayTransformer = transformer({
     clazz: Array,
     type: undefined,
-    serialize: (value: unknown[], serializer: Serializer) => serializer.serializeArray(value),
-    deserialize: (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeArray(value),
+    serialize: (value, serializer) => serializer.serializeArray(value),
+    deserialize: (value, deserializer) => deserializer.deserializeArray(value),
     isEntity: true,
     isComposite: true,
 });
@@ -140,8 +140,8 @@ const arrayTransformer = transformer({
 const setTransformer = transformer({
     clazz: Set,
     type: 'Set',
-    serialize: (value: Set<unknown>, serializer: Serializer) => serializer.serializeSet(value),
-    deserialize: (value: JsonArray, deserializer: Deserializer) => deserializer.deserializeSet(value),
+    serialize: (value, serializer) => serializer.serializeSet(value),
+    deserialize: (value, deserializer) => deserializer.deserializeSet(value),
     isEntity: true,
     isComposite: true,
 });
@@ -149,8 +149,8 @@ const setTransformer = transformer({
 const mapTransformer = transformer({
     clazz: Map,
     type: 'Map',
-    serialize: (value: Map<unknown, unknown>, serializer: Serializer) => serializer.serializeMap(value),
-    deserialize: (value: JsonMap, deserializer: Deserializer) => deserializer.deserializeMap(value),
+    serialize: (value, serializer) => serializer.serializeMap(value),
+    deserialize: (value, deserializer) => deserializer.deserializeMap(value),
     isEntity: true,
     isComposite: true,
 });
@@ -161,11 +161,11 @@ const mapTransformer = transformer({
 const dateTransformer = transformer({
     clazz: Date,
     type: 'Date',
-    serialize: (value: Date): string | null => {
+    serialize: value => {
         // Date can be invalid; let's serialize it as null.
         return isNaN(+value) ? null : value.toISOString();
     },
-    deserialize: (value: string | null): Date => {
+    deserialize: value => {
         return new Date(value === null ? NaN : value);
     },
 });
@@ -173,11 +173,11 @@ const dateTransformer = transformer({
 const regexpTransformer = transformer({
     clazz: RegExp,
     type: 'RegExp',
-    serialize: (value: RegExp): string => {
+    serialize: value => {
         // Returns a string in the form of `/pattern/flags`.
         return value.toString();
     },
-    deserialize: (value: string): RegExp => {
+    deserialize: value => {
         const body = value.slice(1, value.lastIndexOf('/'));
         const flags = value.slice(value.lastIndexOf('/') + 1);
         return new RegExp(body, flags);
@@ -187,10 +187,10 @@ const regexpTransformer = transformer({
 const urlTransformer = transformer({
     clazz: URL,
     type: 'URL',
-    serialize: (value: URL): string => {
+    serialize: value => {
         return value.toString();
     },
-    deserialize: (value: string): URL => {
+    deserialize: value => {
         return new URL(value);
     },
 });
@@ -239,7 +239,7 @@ export const typedArrayTransformers = typedArrayConstructors.map(clazz => transf
         const uint8Array = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
         return uint8Array.toBase64({ alphabet: BASE64_ALPHABET });
     },
-    deserialize: (value: string) => {
+    deserialize: value => {
         const bytes = Uint8Array.fromBase64(value, { alphabet: BASE64_ALPHABET });
         // Gotcha! The typed arrays expose `byteLength` in bytes, but their constructors expect the length in elements.
         return new clazz(bytes.buffer, bytes.byteOffset, bytes.byteLength / clazz.BYTES_PER_ELEMENT);

@@ -1,9 +1,9 @@
-import { REFERENCE_ANNOTATION, type AnnotatedJsonObject, type TypeId, type Annotations, type JsonObject, type EntityId, type CompositeAnnotation } from './json.ts';
+import { REFERENCE_ANNOTATION, type AnnotatedJsonObject, type TypeId, type Annotations, type JsonObject, type EntityId, type CompositeAnnotation, type RootJsonObject } from './json.ts';
 import { deleteEscapeKeyIfEmpty, Serializer } from './serializer.ts';
 import type { ObjectLike } from './transformers.ts';
 
 export class DeduplicatedSerializer extends Serializer {
-    override serialize(value: unknown): JsonObject {
+    override serialize(value: unknown): RootJsonObject {
         const serialized = super.serialize(value);
 
         addIdentityAnnotations(this.seenEntities);

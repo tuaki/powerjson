@@ -1,11 +1,14 @@
 import { expect } from 'bun:test';
-import type { UberJson } from '../src/uberJson.js';
-import type { JsonObject, JsonValue } from '../src/json.js';
-import type { ObjectLike, Transformer } from '../src/transformers.js';
+import { UberJson } from '../src/uberJson.js';
+import type { Annotations, JsonObject, JsonValue, RootAnnotations } from '../src/json.js';
+import type { Transformer } from '../src/transformers.ts';
 
-export function wrap(value: JsonValue, annotations?: Record<string, unknown>): JsonObject {
+export function wrap(value: JsonValue, annotation?: Annotations[string]): JsonObject {
     return {
-        $: { $: 'wrapped', ...annotations },
+        $: {
+            ...(annotation === undefined ? {} : { w: annotation }),
+            wrapped: true,
+        },
         w: value,
     };
 }
@@ -23,19 +26,42 @@ export class Tester {
         this.reverseJsonOrder = reverseJsonOrder;
     }
 
-    serialize(input: unknown, callback: (serialized: JsonObject) => void) {
+    static createForAll(transformers: Transformer[] = []): Tester {
+        return new Tester([
+            new UberJson({ deduplicate: false, transformers }),
+            new UberJson({ deduplicate: true, transformers }),
+        ]);
+    }
+
+    static addVersionToSerialized(serializer: UberJson, serialized: JsonObject): JsonObject {
+        const version = serializer.deduplicate ? 2 : 1;
+
+        return {
+            ...serialized,
+            $: {
+                ...(serialized.$ as RootAnnotations | undefined ?? {}),
+                $: version,
+            },
+        };
+    }
+
+    serialize(input: unknown, callback: (serialized: JsonObject, serializer: UberJson) => void) {
         for (const serializer of this.serializers) {
             deepFreeze(input);
 
             const serialized = serializer.serialize(input);
-            callback(serialized);
+            callback(serialized, serializer);
         }
     }
 
     serializeDeserialize(input: unknown, ...expectedSerialized: (JsonObject | undefined)[]) {
         let i = 0;
         for (const serializer of this.serializers) {
-            testSerializeDeserialize(serializer, input, expectedSerialized[i], this.reverseJsonOrder);
+            let expected = expectedSerialized[i];
+            if (expected)
+                expected = Tester.addVersionToSerialized(serializer, expected);
+
+            testSerializeDeserialize(serializer, input, expected, this.reverseJsonOrder);
             i = (i + 1) % expectedSerialized.length;
         }
     }
@@ -43,11 +69,6 @@ export class Tester {
     forEach(callback: (serializer: UberJson) => void) {
         for (const serializer of this.serializers)
             callback(serializer);
-    }
-
-    registerTransformer<TObject extends ObjectLike = ObjectLike, TJson extends JsonValue = JsonValue>(transformer: Transformer<TObject, TJson>) {
-        for (const serializer of this.serializers)
-            serializer.registerTransformer(transformer);
     }
 }
 
@@ -235,7 +256,7 @@ function visitEntityPaths(
     objectsInPath.delete(value);
 }
 
-function reverseObjectKeys<T>(value: T): T {
+export function reverseObjectKeys<T>(value: T): T {
     if (typeof value !== 'object' || value === null)
         return value;
 

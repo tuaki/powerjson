@@ -63,7 +63,9 @@ Annotations for properties of an object are stored in the `$` property of the ob
 
 ```ts
 {
-    $: { a: 'number' }
+    $: {
+        a: 'number',
+    },
     a: 'NaN',
 };
 ```
@@ -74,7 +76,9 @@ Arrays (and array-like structures, i.e., `Set` and `Map`) can also have annotati
 
 ```ts
 {
-    $: { m: { 0: 'Map', 2: 'number', 3: 'undefined' } },
+    $: {
+        m: { 0: 'Map', 2: 'number', 3: 'undefined' },
+    },
     m: [ 
         [ 'NaN', 'undefined' ],
     ],
@@ -90,6 +94,20 @@ The flat index works like this:
 
 *SuperJSON uses a very different schema. All type annotations are stored in the top-level `meta.values` property, while references are in the `meta.referentialEqualities` property.*
 
+### Version
+
+UberJson uses different serialization algorithms for different configurations. To select a correct deserialization algorithm, the serialized data contains a version number in the `$.$` property of the root object:
+
+```ts
+{
+    $: {
+        $: 1,
+        ...
+    },
+    ...
+}
+```
+
 ### Wrapping
 
 Primitive values, arrays, and custom classes need to be wrapped to a plain object in order to store their annotations. For example, the `NaN` value is serialized as:
@@ -97,7 +115,8 @@ Primitive values, arrays, and custom classes need to be wrapped to a plain objec
 ```ts
 {
     $: {
-        $: 'wrapped',
+        $: 1,
+        wrapped: true,
         w: 'number',
     },
     w: 'NaN',

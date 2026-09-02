@@ -1,12 +1,8 @@
 import { expect, test, describe } from 'bun:test';
-import { UberJson } from '../src/uberJson.js';
 import type { Annotations, JsonArray, JsonMap } from '../src/json.js';
 import { Tester, wrap } from './utils.js';
 
-const tester = new Tester([
-    new UberJson({ deduplicate: false }),
-    new UberJson({ deduplicate: true }),
-]);
+const tester = Tester.createForAll();
 
 describe('primitive types', () => {
     test.each([
@@ -27,7 +23,7 @@ describe('primitive types', () => {
             $: { input: 'undefined' },
             input: null,
         });
-        tester.serializeDeserialize(undefined, wrap(null, { w: 'undefined' }));
+        tester.serializeDeserialize(undefined, wrap(null, 'undefined'));
     });
 
     test.each([
@@ -40,7 +36,7 @@ describe('primitive types', () => {
             $: { input: 'number' },
             input: expected,
         });
-        tester.serializeDeserialize(input, wrap(expected, { w: 'number' }));
+        tester.serializeDeserialize(input, wrap(expected, 'number'));
     });
 
     test.each([
@@ -53,7 +49,7 @@ describe('primitive types', () => {
             $: { input: 'bigint' },
             input: expected,
         });
-        tester.serializeDeserialize(input, wrap(expected, { w: 'bigint' }));
+        tester.serializeDeserialize(input, wrap(expected, 'bigint'));
     });
 });
 
@@ -99,13 +95,13 @@ describe('containers', () => {
     test.each([ [
         [ undefined ],
         [ null ],
-        { w: { 1: 'undefined' } },
+        { 1: 'undefined' },
     ], [
         [ 1, [ [ undefined ], 2 ] ],
         [ 1, [ [ null ], 2 ] ],
-        { w: { 4: 'undefined' } },
-    ] ])('root array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
-        tester.serializeDeserialize(input, wrap(expected, annotations));
+        { 4: 'undefined' },
+    ] ])('root array %p to %p', (input: unknown[], expected: JsonArray, annotation: Annotations[string]) => {
+        tester.serializeDeserialize(input, wrap(expected, annotation));
     });
 
     test.each([
@@ -119,7 +115,7 @@ describe('containers', () => {
             $: { input: { 0: 'Set' } },
             input,
         });
-        tester.serializeDeserialize(new Set(input), wrap(input, { w: { 0: 'Set' } }));
+        tester.serializeDeserialize(new Set(input), wrap(input, { 0: 'Set' }));
     });
 
     test.each([ [
@@ -147,7 +143,7 @@ describe('containers', () => {
             $: { input: { 0: 'Map' } },
             input,
         });
-        tester.serializeDeserialize(new Map(input), wrap(input, { w: { 0: 'Map' } }));
+        tester.serializeDeserialize(new Map(input), wrap(input, { 0: 'Map' }));
     });
 
     test.each<[[unknown, unknown][], JsonMap, Annotations]>([ [
@@ -174,16 +170,16 @@ describe('containers', () => {
         });
     });
 
-    test.each<[[unknown, unknown][], JsonMap, Annotations]>([ [
+    test.each<[[unknown, unknown][], JsonMap, Annotations[string]]>([ [
         [ [ undefined, undefined ] ],
         [ [ null, null ] ],
-        { w: { 0: 'Map', 2: 'undefined', 3: 'undefined' } },
+        { 0: 'Map', 2: 'undefined', 3: 'undefined' },
     ], [
         [ [ 'key', [ undefined ] ], [ [ undefined ], 'input' ] ],
         [ [ 'key', [ null ] ], [ [ null ], 'input' ] ],
-        { w: { 0: 'Map', 4: 'undefined', 7: 'undefined' } },
-    ] ])('root map %p to %p', (input, expected, annotations) => {
-        tester.serializeDeserialize(new Map(input), wrap(expected, annotations));
+        { 0: 'Map', 4: 'undefined', 7: 'undefined' },
+    ] ])('root map %p to %p', (input, expected, annotation) => {
+        tester.serializeDeserialize(new Map(input), wrap(expected, annotation));
     });
 });
 
@@ -229,7 +225,8 @@ describe('special objects', () => {
 
     test.each(forbiddenObjectKeys)('deserialization rejects forbidden key %s', forbiddenKey => {
         tester.forEach(serializer => {
-            const inputJson = `{ "${forbiddenKey}": 1 }`;
+            const version = serializer.deduplicate ? 2 : 1;
+            const inputJson = `{ "$": { "$": ${version} }, "${forbiddenKey}": 1 }`;
 
             expect(() => serializer.parse(inputJson)).toThrowError(new RegExp(forbiddenKey));
             expect((Object.prototype as Record<string, unknown>).value).toBeUndefined();
@@ -251,7 +248,7 @@ describe('typed arrays', () => {
             $: { input: 'Uint8Array' },
             input: expected,
         });
-        tester.serializeDeserialize(input, wrap(expected, { w: 'Uint8Array' }));
+        tester.serializeDeserialize(input, wrap(expected, 'Uint8Array'));
     });
 
     test.each([
@@ -269,7 +266,7 @@ describe('typed arrays', () => {
             $: { input: 'Float64Array' },
             input: expected,
         });
-        tester.serializeDeserialize(input, wrap(expected, { w: 'Float64Array' }));
+        tester.serializeDeserialize(input, wrap(expected, 'Float64Array'));
     });
 });
 
@@ -286,15 +283,16 @@ describe('predefined types', () => {
             $: { input: 'Date' },
             input: expected,
         });
-        tester.serializeDeserialize(input, wrap(expected, { w: 'Date' }));
+        tester.serializeDeserialize(input, wrap(expected, 'Date'));
     });
 
     test('Invalid date', () => {
-        tester.serialize({ input: new Date(NaN) }, serialized => {
-            expect(serialized).toStrictEqual({
+        tester.serialize({ input: new Date(NaN) }, (serialized, serializer) => {
+            const expected = Tester.addVersionToSerialized(serializer, {
                 $: { input: 'Date' },
                 input: null,
             });
+            expect(serialized).toStrictEqual(expected);
         });
     });
 
@@ -306,7 +304,7 @@ describe('predefined types', () => {
             $: { input: 'RegExp' },
             input: expected,
         });
-        tester.serializeDeserialize(input, wrap(expected, { w: 'RegExp' }));
+        tester.serializeDeserialize(input, wrap(expected, 'RegExp'));
     });
 
     test.each([
@@ -317,7 +315,7 @@ describe('predefined types', () => {
             $: { input: 'URL' },
             input: expected,
         });
-        tester.serializeDeserialize(input, wrap(expected, { w: 'URL' }));
+        tester.serializeDeserialize(input, wrap(expected, 'URL'));
     });
 
     // TODO Add support for Symbol

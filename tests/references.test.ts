@@ -1,13 +1,10 @@
 import { expect, test, describe } from 'bun:test';
-import { Tester } from './utils.js';
+import { reverseObjectKeys, Tester, wrap } from './utils.js';
 import { UberJson } from '../src/uberJson.js';
 import SuperJson from 'superjson';
 
 describe('circular references', () => {
-    const tester = new Tester([
-        new UberJson({ deduplicate: false }),
-        new UberJson({ deduplicate: true }),
-    ]);
+    const tester = Tester.createForAll();
 
     const o: Record<string, unknown> = { name: 'o' };
     o.self = o;
@@ -156,19 +153,13 @@ describe('circular references', () => {
         const z: unknown[] = [ 'z' ];
         z.push(z);
 
-        tester.serializeDeserialize(z, {
-            $: { $: 'wrapped', w: { 2: 'ref' } },
-            w: [
-                'z',
-                1,
-            ],
-        }, {
-            $: { $: 'wrapped', w: { 0: 1, 2: 'ref' } },
-            w: [
-                'z',
-                1,
-            ],
-        });
+        tester.serializeDeserialize(z, wrap(
+            [ 'z', 1 ],
+            { 2: 'ref' },
+        ), wrap(
+            [ 'z', 1 ],
+            { 0: 1, 2: 'ref' },
+        ));
     });
 
     test('set', () => {
@@ -192,17 +183,13 @@ describe('circular references', () => {
         const s = new Set();
         s.add(s);
 
-        tester.serializeDeserialize(s, {
-            $: { $: 'wrapped', w: { 0: 'Set', 1: 'ref' } },
-            w: [
-                1,
-            ],
-        }, {
-            $: { $: 'wrapped', w: { 0: [ 'Set', 1 ], 1: 'ref' } },
-            w: [
-                1,
-            ],
-        });
+        tester.serializeDeserialize(s, wrap(
+            [ 1 ],
+            { 0: 'Set', 1: 'ref' },
+        ), wrap(
+            [ 1 ],
+            { 0: [ 'Set', 1 ], 1: 'ref' },
+        ));
     });
 
     test('map', () => {
@@ -226,17 +213,17 @@ describe('circular references', () => {
         const m = new Map();
         m.set(m, m);
 
-        tester.serializeDeserialize(m, {
-            $: { $: 'wrapped', w: { 0: 'Map', 2: 'ref', 3: 'ref' } },
-            w: [
+        tester.serializeDeserialize(m, wrap(
+            [
                 [ 1, 1 ],
             ],
-        }, {
-            $: { $: 'wrapped', w: { 0: [ 'Map', 1 ], 2: 'ref', 3: 'ref' } },
-            w: [
+            { 0: 'Map', 2: 'ref', 3: 'ref' },
+        ), wrap(
+            [
                 [ 1, 1 ],
             ],
-        });
+            { 0: [ 'Map', 1 ], 2: 'ref', 3: 'ref' },
+        ));
     });
 });
 
@@ -381,7 +368,8 @@ describe('deduplication', () => {
 describe('shuffled json', () => {
     const tester = new Tester([
         new UberJson({ deduplicate: false }),
-        new UberJson({ deduplicate: true, sortObjectKeys: true }),
+        new UberJson({ deduplicate: true }),
+        new UberJson({ deduplicate: true, sortObjectKeys: 'always' }),
     ], {
         reverseJsonOrder: true,
     });
@@ -500,5 +488,21 @@ describe('shuffled json', () => {
         };
 
         tester.serializeDeserialize(input);
+    });
+
+    test('throws error when sorting is disabled', () => {
+        const uberJson = new UberJson({ deduplicate: true, sortObjectKeys: 'never' });
+
+        const shared = { value: 1 };
+        const input = {
+            first: shared,
+            second: shared,
+            nested: { third: shared },
+        };
+
+        let serialized = uberJson.serialize(input);
+        serialized = reverseObjectKeys(serialized);
+
+        expect(() => uberJson.deserialize(serialized)).toThrowError(/Sorting of object keys is disabled/);
     });
 });
