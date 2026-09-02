@@ -3,17 +3,17 @@ import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transfo
 import { SimpleSerializer } from './simpleSerializer.ts';
 import { DeduplicatedSerializer } from './deduplicatedSerializer.ts';
 import { SimpleDeserializer } from './simpleDeserializer.ts';
-import { DeduplicatedDeserializer, type SortKeysOption } from './deduplicatedDeserializer.ts';
+import { DeduplicatedDeserializer, type SortObjectKeysOption } from './deduplicatedDeserializer.ts';
 
 type UberJsonConfig = {
     deduplicate?: boolean;
-    sortObjectKeys?: SortKeysOption;
+    sortObjectKeys?: SortObjectKeysOption;
     transformers?: Transformer[];
 };
 
 export class UberJson {
     readonly deduplicate: boolean;
-    readonly sortObjectKeys: SortKeysOption;
+    readonly sortObjectKeys: SortObjectKeysOption;
 
     constructor({
         deduplicate = false,

@@ -43,7 +43,11 @@ In both modes, a reference is expressed as a number with `ref` type annotation. 
 
 JS has a [well-defined order](https://tc39.es/ecma262/multipage/ordinary-and-exotic-objects-behaviours.html#sec-ordinaryownpropertykeys) of object keys, which mostly depends on the order in which the keys were added to the object. On the contrary, in JSON, object is an unordered collection of key-value pairs. Therefore, UberJson does not guarantee that the deserialized objects will have the same key order as the original objects (arrays, sets, and maps *do* guarantee the order of their elements because they are serialized as arrays).
 
-This has also some performance implications. When deserializing references in the *deduplication* mode, UberJson expects that any referenced object has already been deserialized, allowing it to resolve references efficiently. In practice, vast majority of tools do not change the order of the keys, so this optimization is completely safe. However, if your use case involves changing the order of the keys (e.g., [JCS](https://www.rfc-editor.org/info/rfc8785/)), you can set the `sortObjectKeys` option to `true` to force UberJson to sort the keys before deserialization.
+This has also some performance implications. When deserializing references in the *deduplication* mode, UberJson expects that any referenced object has already been deserialized, allowing it to resolve references efficiently. In practice, vast majority of tools do not change the order of the keys, so this optimization is completely safe. However, if your use case involves changing the order of the keys (e.g., [JCS](https://www.rfc-editor.org/info/rfc8785/)), you should set the `sortObjectKeys` option. There are three possible values:
+
+- `always`: The objects will be sorted before deserialization. *This is the best option if you know there is a high probability of key order being changed.*
+- `catch` (default): The objects won't be sorted, but if a reference is not found, we sort them and try again. *Choose this if you think the key order is usually preserved, but you wouldn't bet your life on it.*
+- `never`: The objects won't be sorted. *Useful if you want to proactively detect any possible slowdown or if you enjoy living on the edge.*
 
 *SuperJSON uses a completely different approach to reference serialization which doesn't depend on the order of the keys.*
 

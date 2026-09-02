@@ -503,6 +503,6 @@ describe('shuffled json', () => {
         let serialized = uberJson.serialize(input);
         serialized = reverseObjectKeys(serialized);
 
-        expect(() => uberJson.deserialize(serialized)).toThrowError(/Sorting of object keys is disabled/);
+        expect(() => uberJson.deserialize(serialized)).toThrowError(/Try changing the "sortObjectKeys" option./);
     });
 });

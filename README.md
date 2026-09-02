@@ -56,7 +56,7 @@ There is no type validation so you shouldn't rely on the type of the deserialize
 We try to keep the configuration minimal. However, in some use cases, these options can greatly enhance performance:
 
 - `deduplicate` (default: `false`) - see the [Referential equality](./docs/advanced-topics.md#referential-equality) section for details.
-- `sortObjectKeys` (default: `false`) - see the [Object key order](./docs/advanced-topics.md#object-key-order) section for details.
+- `sortObjectKeys` (default: `catch`) - see the [Object key order](./docs/advanced-topics.md#object-key-order) section for details.
 
 The default `UberJson` instance is immutable; you are supposed to create a new instance with custom configuration:
 

@@ -2,10 +2,25 @@ import { Deserializer } from './deserializer.ts';
 import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey, type RootJsonObject } from './json.ts';
 import { validateObjectKey, type ObjectLike } from './transformers.ts';
 
-export type SortKeysOption = 'always' | 'catch' | 'never';
+export type SortObjectKeysOption =
+    /**
+     * The objects will be sorted before deserialization.
+     * This is the best option if you know there is a high probability of key order being changed.
+     */
+    | 'always'
+    /**
+     * The objects won't be sorted, but if a reference is not found, we sort them and try again.
+     * Choose this if you think the key order is usually preserved, but you wouldn't bet your life on it.
+     */
+    | 'catch'
+    /**
+     * The objects won't be sorted.
+     * Useful if you want to proactively detect any possible slowdown or if you enjoy living on the edge.
+     */
+    | 'never';
 
 export class DeduplicatedDeserializer extends Deserializer {
-    private sortObjectKeys!: SortKeysOption;
+    private sortObjectKeys!: SortObjectKeysOption;
 
     override deserialize(value: RootJsonObject) {
         this.sortObjectKeys = this.uberJson.sortObjectKeys;
