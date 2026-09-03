@@ -1,6 +1,6 @@
 import { expect, test, describe } from 'bun:test';
 import { reverseObjectKeys, Tester, wrap } from './utils.js';
-import { UberJson } from '../src/uberJson.js';
+import { PowerJson } from '../src/powerJson.ts';
 import SuperJson from 'superjson';
 
 describe('circular references', () => {
@@ -229,7 +229,7 @@ describe('circular references', () => {
 
 describe('reference objects', () => {
     // Some bugs are only visible with reference objects.
-    const uberJson = new UberJson({ deduplicate: true });
+    const powerJson = new PowerJson({ deduplicate: true });
     const superJson = new SuperJson({ dedupe: true });
 
     test('string properties of arrays are omitted', () => {
@@ -248,7 +248,7 @@ describe('reference objects', () => {
             array,
         };
 
-        const output = uberJson.deserialize(uberJson.serialize(input)) as typeof input;
+        const output = powerJson.deserialize(powerJson.serialize(input)) as typeof input;
 
         expect(output).toStrictEqual(input);
         // The string properties should be omitted during serialization.
@@ -269,7 +269,7 @@ describe('reference objects', () => {
 
         const input = { a, b, map };
 
-        const output = uberJson.deserialize(uberJson.serialize(input)) as typeof input;
+        const output = powerJson.deserialize(powerJson.serialize(input)) as typeof input;
         // No testing for equality as the comparer doesn't handle references as keys.
         expect([ ...output.map.values() ]).toStrictEqual([ 'a', 'b' ]);
 
@@ -283,7 +283,7 @@ describe('reference objects', () => {
 
 describe('deduplication', () => {
     const tester = new Tester([
-        new UberJson({ deduplicate: true }),
+        new PowerJson({ deduplicate: true }),
     ]);
 
 
@@ -367,9 +367,9 @@ describe('deduplication', () => {
 
 describe('shuffled json', () => {
     const tester = new Tester([
-        new UberJson({ deduplicate: false }),
-        new UberJson({ deduplicate: true }),
-        new UberJson({ deduplicate: true, sortObjectKeys: 'always' }),
+        new PowerJson({ deduplicate: false }),
+        new PowerJson({ deduplicate: true }),
+        new PowerJson({ deduplicate: true, sortObjectKeys: 'always' }),
     ], {
         reverseJsonOrder: true,
     });
@@ -491,7 +491,7 @@ describe('shuffled json', () => {
     });
 
     test('throws error when sorting is disabled', () => {
-        const uberJson = new UberJson({ deduplicate: true, sortObjectKeys: 'never' });
+        const powerJson = new PowerJson({ deduplicate: true, sortObjectKeys: 'never' });
 
         const shared = { value: 1 };
         const input = {
@@ -500,9 +500,9 @@ describe('shuffled json', () => {
             nested: { third: shared },
         };
 
-        let serialized = uberJson.serialize(input);
+        let serialized = powerJson.serialize(input);
         serialized = reverseObjectKeys(serialized);
 
-        expect(() => uberJson.deserialize(serialized)).toThrowError(/Try changing the "sortObjectKeys" option./);
+        expect(() => powerJson.deserialize(serialized)).toThrowError(/Try changing the "sortObjectKeys" option./);
     });
 });

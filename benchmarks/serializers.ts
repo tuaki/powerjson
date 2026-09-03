@@ -1,5 +1,5 @@
 import { createSerializer } from './measure.ts';
-import { UberJson } from '../src/uberJson.ts';
+import { PowerJson } from '../src/powerJson.ts';
 import SuperJson from 'superjson';
 import * as devalue from 'devalue';
 import serializeJavascript from 'serialize-javascript';
@@ -12,15 +12,15 @@ export function jsonSerializer() {
     });
 }
 
-export function uberJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
-    const name = `uberjson-${deduplicate ? 'deduplicate' : 'simple'}`;
-    const uberJson = new UberJson({ deduplicate });
+export function powerJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
+    const name = `powerjson-${deduplicate ? 'deduplicate' : 'simple'}`;
+    const powerJson = new PowerJson({ deduplicate });
 
     return createSerializer(name, {
-        stringify: value => uberJson.stringify(value),
-        parse: json => uberJson.parse(json),
-        serialize: value => uberJson.serialize(value),
-        deserialize: serialized => uberJson.deserialize(serialized),
+        stringify: value => powerJson.stringify(value),
+        parse: json => powerJson.parse(json),
+        serialize: value => powerJson.serialize(value),
+        deserialize: serialized => powerJson.deserialize(serialized),
         toJson: serialized => JSON.stringify(serialized),
         fromJson: json => JSON.parse(json),
     });

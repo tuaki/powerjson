@@ -5,13 +5,13 @@ import { DeduplicatedSerializer } from './deduplicatedSerializer.ts';
 import { SimpleDeserializer } from './simpleDeserializer.ts';
 import { DeduplicatedDeserializer, type SortObjectKeysOption } from './deduplicatedDeserializer.ts';
 
-type UberJsonConfig = {
+type PowerJsonConfig = {
     deduplicate?: boolean;
     sortObjectKeys?: SortObjectKeysOption;
     transformers?: Transformer[];
 };
 
-export class UberJson {
+export class PowerJson {
     readonly deduplicate: boolean;
     readonly sortObjectKeys: SortObjectKeysOption;
 
@@ -19,7 +19,7 @@ export class UberJson {
         deduplicate = false,
         sortObjectKeys = 'catch',
         transformers = [],
-    }: UberJsonConfig = {}) {
+    }: PowerJsonConfig = {}) {
         this.deduplicate = deduplicate;
         this.sortObjectKeys = sortObjectKeys;
 
@@ -108,10 +108,10 @@ export class UberJson {
         return transformer;
     }
 
-    private static defaultInstance = new UberJson();
+    private static defaultInstance = new PowerJson();
 
-    static serialize = UberJson.defaultInstance.serialize.bind(UberJson.defaultInstance);
-    static deserialize = UberJson.defaultInstance.deserialize.bind(UberJson.defaultInstance);
-    static stringify = UberJson.defaultInstance.stringify.bind(UberJson.defaultInstance);
-    static parse = UberJson.defaultInstance.parse.bind(UberJson.defaultInstance);
+    static serialize = PowerJson.defaultInstance.serialize.bind(PowerJson.defaultInstance);
+    static deserialize = PowerJson.defaultInstance.deserialize.bind(PowerJson.defaultInstance);
+    static stringify = PowerJson.defaultInstance.stringify.bind(PowerJson.defaultInstance);
+    static parse = PowerJson.defaultInstance.parse.bind(PowerJson.defaultInstance);
 }

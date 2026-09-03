@@ -1,9 +1,9 @@
 {
-    "name": "uberjson",
-    "version": "1.0.0",
+    "name": "powerjson",
+    "version": "0.0.2",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/tuaki/uberjson.git"
+        "url": "git+https://github.com/tuaki/powerjson.git"
     },
     "author": {
         "name": "Jáchym Bártík",

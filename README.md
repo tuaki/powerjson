@@ -1,19 +1,19 @@
-# UberJson
+# PowerJson
 
 Serialize any JavaScript object to pure JSON and back, including built-in types, custom classes, circular references, and more.
 
-## Why UberJson?
+## Why PowerJson?
 
 JSON has its limitations. Many libraries try to overcome them by extending its grammar or inventing elaborate serialization schemas. Unlike them, we want to keep the simplicity and human-readability of JSON while extending its capabilities.
 
-UberJson is heavily inspired by [SuperJSON](https://github.com/ravionhq/superjson#getting-started). It's a great library with the same goals as UberJson, but it has [some design flaws](./docs/superjson-limitations.md) that lead to worse performance, less readable output, and even bugs in some edge cases. UberJson is an attempt to fix these issues and provide a better alternative to SuperJSON. Additional differences between the two libraries are described [here](./docs/advanced-topics.md).
+PowerJson is heavily inspired by [SuperJSON](https://github.com/ravionhq/superjson#getting-started). It's a great library with the same goals as PowerJson, but it has [some design flaws](./docs/superjson-limitations.md) that lead to worse performance, less readable output, and even bugs in some edge cases. PowerJson is an attempt to fix these issues and provide a better alternative to SuperJSON. Additional differences between the two libraries are described [here](./docs/advanced-topics.md).
 
 ## Basic usage
 
-You can use UberJson as a drop-in replacement for `JSON.stringify` and `JSON.parse`. It has the a similar API, but it can handle many more types of values:
+You can use PowerJson as a drop-in replacement for `JSON.stringify` and `JSON.parse`. It has the a similar API, but it can handle many more types of values:
 
 ```ts
-import { UberJson } from 'uberjson';
+import { PowerJson } from 'powerjson';
 
 const data = {
     a: NaN,
@@ -21,7 +21,7 @@ const data = {
     c: new Set([ 'key' ]),
 };
 
-const jsonString = UberJson.stringify(data, 4);
+const jsonString = PowerJson.stringify(data, 4);
 /*
 {
     "$": {
@@ -40,12 +40,12 @@ const jsonString = UberJson.stringify(data, 4);
 }
 */
 
-const parsedData = UberJson.parse(jsonString);
+const parsedData = PowerJson.parse(jsonString);
 ```
 
 ### `serialize` & `deserialize`
 
-Use these functions to convert between JavaScript values and UberJson's JSON-compatible representation without converting to a string. This is useful for, e.g., passing the data to a database which does it's own stringification.
+Use these functions to convert between JavaScript values and PowerJson's JSON-compatible representation without converting to a string. This is useful for, e.g., passing the data to a database which does it's own stringification.
 
 ### TypeScript
 
@@ -58,17 +58,17 @@ We try to keep the configuration minimal. However, in some use cases, these opti
 - `deduplicate` (default: `false`) - see the [Referential equality](./docs/advanced-topics.md#referential-equality) section for details.
 - `sortObjectKeys` (default: `catch`) - see the [Object key order](./docs/advanced-topics.md#object-key-order) section for details.
 
-The default `UberJson` instance is immutable; you are supposed to create a new instance with custom configuration:
+The default `PowerJson` instance is immutable; you are supposed to create a new instance with custom configuration:
 
 ```ts
-const uberJson = new UberJson({ deduplicate: true });
+const powerJson = new PowerJson({ deduplicate: true });
 ```
 
 ## Supported types
 
-These types are supported by UberJson (so far). More types will be added as they become part of the standard JavaScript API (e.g., `Temporal`).
+These types are supported by PowerJson (so far). More types will be added as they become part of the standard JavaScript API (e.g., `Temporal`).
 
-| type                                                                                       | supported by standard JSON? | supported by UberJson? |
+| type                                                                                       | supported by standard JSON? | supported by PowerJson? |
 | ------------------------------------------------------------------------------------------ | --------------------------- | ---------------------- |
 | `string`                                                                                   | ✅                          | ✅                     |
 | `number`                                                                                   | ⚠️ (1.)                     | ✅                     |
@@ -96,7 +96,7 @@ These types are supported by UberJson (so far). More types will be added as they
 Any object with an unsupported type will be serialized as a plain JS object. You can change that by registering a custom transformer for your class. For example, transformer for Luxon's `DateTime` might look like this:
 
 ```ts
-import { UberJson, transformer } from 'uberjson';
+import { PowerJson, transformer } from 'powerjson';
 
 const dateTimeTransformer = transformer({
     clazz: DateTime,
@@ -107,7 +107,7 @@ const dateTimeTransformer = transformer({
     isComposite: false, // The type won't be serialized to an array (or, if it will, it won't use type annotations for its properties).
 });
 
-const uberJson = new UberJson({ transformers: [ dateTimeTransformer ] });
+const powerJson = new PowerJson({ transformers: [ dateTimeTransformer ] });
 ```
 
 See [custom tests](./tests/custom.test.ts) for more examples.

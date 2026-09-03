@@ -22,7 +22,7 @@ Ultimately, anything serialized with SuperJSON looks like this:
 }
 ```
 
-I.e., there is always an additional level of nesting. This means one extra click when inspecting a request's data in developer tools, one extra level of indentation when reading the data in a log, and so on. In UberJson, we store the annotations in a special `$` property of the object itself. If the value being serialized is a plain JS object, there will be no additional nesting.
+I.e., there is always an additional level of nesting. This means one extra click when inspecting a request's data in developer tools, one extra level of indentation when reading the data in a log, and so on. In PowerJson, we store the annotations in a special `$` property of the object itself. If the value being serialized is a plain JS object, there will be no additional nesting.
 
 ## Non-locality of annotations
 
@@ -43,7 +43,7 @@ SuperJSON stores all type annotations in the `meta.values` property:
 }
 ```
 
-This makes large objects hard to read, because we have to navigate long paths in the `meta.values` object to find the type annotations. In UberJson, the same object would look like this:
+This makes large objects hard to read, because we have to navigate long paths in the `meta.values` object to find the type annotations. In PowerJson, the same object would look like this:
 
 ```ts
 {
@@ -108,12 +108,12 @@ The issues above already cause important performance problems:
 
 ### Serialization function lookup
 
-Probably the most significant performance bottleneck is in finding the serialization function for a given value. SuperJSON uses a linear search over all registered serializers, calling their `isApplicable` function until it returns `true`. This is done even for the most basic types like `undefined`, `number`, etc. UberJson uses a [much faster approach](advanced-topics.md#serialization-function-lookup) base on a `switch (typeof value)` statement for primitive types, and a `Map` of object prototypes for instant lookup of classes.
+Probably the most significant performance bottleneck is in finding the serialization function for a given value. SuperJSON uses a linear search over all registered serializers, calling their `isApplicable` function until it returns `true`. This is done even for the most basic types like `undefined`, `number`, etc. PowerJson uses a [much faster approach](advanced-topics.md#serialization-function-lookup) base on a `switch (typeof value)` statement for primitive types, and a `Map` of object prototypes for instant lookup of classes.
 
 ### Typed arrays
 
-SuperJSON serializes values like `new Uint8Array([1, 2, 3])` as numeric arrays. This is extremely inefficient (for both space and time), so UberJson uses base64 encoding instead.
+SuperJSON serializes values like `new Uint8Array([1, 2, 3])` as numeric arrays. This is extremely inefficient (for both space and time), so PowerJson uses base64 encoding instead.
 
 ### Where is SuperJSON faster
 
-SuperJSON has one specific advantage: during deserialization, it checks only the `meta` property for type and reference annotations, while UberJson has to traverse the entire object to find all `$` properties. This means that if there is a large object with very few annotations, SuperJSON can be faster. However, in most real-world scenarios, the number of annotations is proportional to the size of the object, so UberJson is usually faster. Besides that, the total time of stringify + parse is usually dominated by the serialization step, which is much faster in UberJson.
+SuperJSON has one specific advantage: during deserialization, it checks only the `meta` property for type and reference annotations, while PowerJson has to traverse the entire object to find all `$` properties. This means that if there is a large object with very few annotations, SuperJSON can be faster. However, in most real-world scenarios, the number of annotations is proportional to the size of the object, so PowerJson is usually faster. Besides that, the total time of stringify + parse is usually dominated by the serialization step, which is much faster in PowerJson.

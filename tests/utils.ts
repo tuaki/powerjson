@@ -1,5 +1,5 @@
 import { expect } from 'bun:test';
-import { UberJson } from '../src/uberJson.js';
+import { PowerJson } from '../src/powerJson.ts';
 import type { Annotations, JsonObject, JsonValue, RootAnnotations } from '../src/json.js';
 import type { Transformer } from '../src/transformers.ts';
 
@@ -14,10 +14,10 @@ export function wrap(value: JsonValue, annotation?: Annotations[string]): JsonOb
 }
 
 export class Tester {
-    private serializers: UberJson[];
+    private serializers: PowerJson[];
     private reverseJsonOrder: boolean;
 
-    constructor(serializers: UberJson | UberJson[], {
+    constructor(serializers: PowerJson | PowerJson[], {
         reverseJsonOrder = false,
     }: {
         reverseJsonOrder?: boolean;
@@ -28,12 +28,12 @@ export class Tester {
 
     static createForAll(transformers: Transformer[] = []): Tester {
         return new Tester([
-            new UberJson({ deduplicate: false, transformers }),
-            new UberJson({ deduplicate: true, transformers }),
+            new PowerJson({ deduplicate: false, transformers }),
+            new PowerJson({ deduplicate: true, transformers }),
         ]);
     }
 
-    static addVersionToSerialized(serializer: UberJson, serialized: JsonObject): JsonObject {
+    static addVersionToSerialized(serializer: PowerJson, serialized: JsonObject): JsonObject {
         const version = serializer.deduplicate ? 2 : 1;
 
         return {
@@ -45,7 +45,7 @@ export class Tester {
         };
     }
 
-    serialize(input: unknown, callback: (serialized: JsonObject, serializer: UberJson) => void) {
+    serialize(input: unknown, callback: (serialized: JsonObject, serializer: PowerJson) => void) {
         for (const serializer of this.serializers) {
             deepFreeze(input);
 
@@ -66,13 +66,13 @@ export class Tester {
         }
     }
 
-    forEach(callback: (serializer: UberJson) => void) {
+    forEach(callback: (serializer: PowerJson) => void) {
         for (const serializer of this.serializers)
             callback(serializer);
     }
 }
 
-export function testSerializeDeserialize(serializer: UberJson, input: unknown, expectedSerialized?: JsonObject, reverseJsonOrder = false) {
+export function testSerializeDeserialize(serializer: PowerJson, input: unknown, expectedSerialized?: JsonObject, reverseJsonOrder = false) {
     // Make sure the input is not mutated during serialization.
     deepFreeze(input);
 

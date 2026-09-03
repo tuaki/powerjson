@@ -9,7 +9,7 @@ import { repeatedTemporalValuesScenario } from './scenarios/repeatedTemporalValu
 import { mixedExtendedTypesScenario } from './scenarios/mixedExtendedTypes.ts';
 import { printComparisonTables, type ComparisonGroup, type ComparisonMetric } from './aggregate.ts';
 import { REFERENCE_DATE } from './config.ts';
-import { devalueSerializer, jsonSerializer, nextJsonSerializer, serializeJavascriptSerializer, superJsonSerializer, uberJsonSerializer } from './serializers.ts';
+import { devalueSerializer, jsonSerializer, nextJsonSerializer, serializeJavascriptSerializer, superJsonSerializer, powerJsonSerializer } from './serializers.ts';
 
 function main() {
     faker.setDefaultRefDate(REFERENCE_DATE);
@@ -33,7 +33,7 @@ function createScenarios(): Scenario[] {
         // This is actually a bug in superJson.
         // Their serializer caches transformed results for all objects it sees. If it sees the same object again, it will either return a reference (if `dedupe: true`) or the cached result.
         // However, if `dedupe: false`, serialization depends on the path to the object - because the path is used to break cycles. So, an object like `a: { b: { c: a } }` should break the cycle when encountering `a` for the second time, while the same cycle but starting from `b` should break the cycle at `b`.
-        // UberJson always expands the objects as deep as possible, which results in an exponential growth on this specific scenario. Nevertheless, this is a very artificial scenario. In this case, the only reasonable way is to deduplicate - in which case, unfortunately, superJson throws an error.
+        // PowerJson always expands the objects as deep as possible, which results in an exponential growth on this specific scenario. Nevertheless, this is a very artificial scenario. In this case, the only reasonable way is to deduplicate - in which case, unfortunately, superJson throws an error.
         circularReferencesScenario(),
 
         repeatedTemporalValuesScenario(),
@@ -45,8 +45,8 @@ function createSerializers() {
     return [
         jsonSerializer(),
 
-        uberJsonSerializer({ deduplicate: false }),
-        uberJsonSerializer({ deduplicate: true }),
+        powerJsonSerializer({ deduplicate: false }),
+        powerJsonSerializer({ deduplicate: true }),
 
         superJsonSerializer({ dedupe: false }),
         superJsonSerializer({ dedupe: true }),
@@ -60,11 +60,11 @@ function createSerializers() {
 }
 
 const comparisonGroups: ComparisonGroup[] = [ {
-    serializers: [ 'uberjson-simple', 'superjson-default' ],
+    serializers: [ 'powerjson-simple', 'superjson-default' ],
 }, {
-    serializers: [ 'uberjson-deduplicate', 'superjson-dedupe' ],
+    serializers: [ 'powerjson-deduplicate', 'superjson-dedupe' ],
 }, {
-    serializers: [ 'uberjson-simple', 'uberjson-deduplicate', 'superjson-default', 'superjson-dedupe', 'devalue', 'serialize-javascript', 'next-json' ],
+    serializers: [ 'powerjson-simple', 'powerjson-deduplicate', 'superjson-default', 'superjson-dedupe', 'devalue', 'serialize-javascript', 'next-json' ],
 } ];
 
 const comparisonMetrics: ComparisonMetric[] = [ {

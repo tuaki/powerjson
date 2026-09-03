@@ -1,12 +1,12 @@
 import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type RootJsonObject, type TypeId } from './json.ts';
 import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.ts';
-import type { UberJson } from './uberJson.ts';
+import type { PowerJson } from './powerJson.ts';
 
 export abstract class Deserializer {
-    readonly uberJson: UberJson;
+    readonly powerJson: PowerJson;
 
-    constructor(uberJson: UberJson) {
-        this.uberJson = uberJson;
+    constructor(powerJson: PowerJson) {
+        this.powerJson = powerJson;
     }
 
     deserialize(value: RootJsonObject): unknown {
@@ -187,7 +187,7 @@ export abstract class Deserializer {
             case BIGINT_ANNOTATION:
                 return BigInt(value as string);
             default: {
-                const transformer = this.uberJson.getTransformerForType(typeId);
+                const transformer = this.powerJson.getTransformerForType(typeId);
                 return transformer.deserialize(value, this);
             }
         }

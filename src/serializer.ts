@@ -1,13 +1,13 @@
 import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
 import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike } from './transformers.ts';
-import type { UberJson } from './uberJson.ts';
+import type { PowerJson } from './powerJson.ts';
 
 export abstract class Serializer {
-    readonly uberJson: UberJson;
+    readonly powerJson: PowerJson;
     readonly version: number;
 
-    constructor(uberJson: UberJson, version: number) {
-        this.uberJson = uberJson;
+    constructor(powerJson: PowerJson, version: number) {
+        this.powerJson = powerJson;
         this.version = version;
     }
 
@@ -218,7 +218,7 @@ export abstract class Serializer {
     }
 
     private serializeObjectLike(value: ObjectLike): JsonValue | undefined {
-        const transformer = this.uberJson.getTransformerForObject(value);
+        const transformer = this.powerJson.getTransformerForObject(value);
 
         if (transformer.isComposite && this.compositeIndex === undefined)
             this.compositeIndex = 0;
