@@ -58,11 +58,9 @@ test('Luxon DateTime to ISO string', () => {
 });
 
 class SimpleDateTime {
-    readonly iso: string;
-
-    private constructor(iso: string) {
-        this.iso = iso;
-    }
+    private constructor(
+        readonly iso: string,
+    ) {}
 
     static create(iso: string): SimpleDateTime {
         return new SimpleDateTime(iso);
@@ -93,15 +91,11 @@ test('class to primitive', () => {
 });
 
 class Point {
-    readonly x: number;
-    readonly y: number;
-    readonly z?: number;
-
-    constructor(x: number, y: number, z?: number) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
+    constructor(
+        readonly x: number,
+        readonly y: number,
+        readonly z?: number,
+    ) {}
 }
 
 const pointTransformer = transformer({
@@ -139,11 +133,9 @@ test('class to array', () => {
 });
 
 class Author {
-    readonly name: string;
-
-    constructor(name: string) {
-        this.name = name;
-    }
+    constructor(
+        readonly name: string,
+    ) {}
 }
 
 const authorTransformer = transformer({
@@ -163,17 +155,12 @@ const authorTransformer = transformer({
 });
 
 class Comment {
-    readonly author: Author;
-    readonly content: string;
-    readonly createdAt: Date;
-    readonly responses?: Comment[];
-
-    constructor(author: Author, content: string, createdAt: Date, responses?: Comment[]) {
-        this.author = author;
-        this.content = content;
-        this.createdAt = createdAt;
-        this.responses = responses;
-    }
+    constructor(
+        readonly author: Author,
+        readonly content: string,
+        readonly createdAt: Date,
+        readonly responses?: Comment[],
+    ) {}
 }
 
 const commentTransformer = transformer({
@@ -279,11 +266,9 @@ test('recursively nested classes', () => {
 });
 
 abstract class A {
-    readonly id: number;
-
-    protected constructor(id: number) {
-        this.id = id;
-    }
+    protected constructor(
+        readonly id: number,
+    ) {}
 }
 
 const aTransformer = transformer({
@@ -296,20 +281,21 @@ const aTransformer = transformer({
 });
 
 class B extends A {
-    readonly label: string;
-
-    constructor(id: number, label: string) {
+    constructor(
+        id: number,
+        readonly label: string,
+    ) {
         super(id);
-        this.label = label;
     }
 }
 
 class C extends B {
-    readonly isActive: boolean;
-
-    constructor(id: number, label: string, isActive: boolean) {
+    constructor(
+        id: number,
+        label: string,
+        readonly isActive: boolean,
+    ) {
         super(id, label);
-        this.isActive = isActive;
     }
 }
 
@@ -330,11 +316,13 @@ const cTransformer = transformer({
 });
 
 class D extends C {
-    readonly extra: string;
-
-    constructor(id: number, label: string, isActive: boolean, extra: string) {
+    constructor(
+        id: number,
+        label: string,
+        isActive: boolean,
+        readonly extra: string,
+    ) {
         super(id, label, isActive);
-        this.extra = extra;
     }
 }
 
