@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { Scenario } from '../measure.ts';
+import type { Scenario } from '../utils.ts';
 
 export function repeatedTemporalValuesScenario(): Scenario {
     return {

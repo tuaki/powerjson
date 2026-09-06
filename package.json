@@ -28,8 +28,8 @@
         "build": "rm -rf dist && bun tsc -p tsconfig.build.json",
         "types": "bun tsc -p src/tsconfig.json && bun tsc -p tsconfig.json",
         "test": "bun test tests",
-        "benchmark": "bun run benchmarks/index.ts",
-        "lint": "bun run eslint eslint.config.ts --fix"
+        "lint": "bun run eslint eslint.config.ts --fix",
+        "benchmark": "bun run benchmarks/index.ts"
     },
     "dependencies": {},
     "devDependencies": {

@@ -1,52 +1,8 @@
 import { faker } from '@faker-js/faker';
 import Table from 'cli-table3';
-import { BENCHMARK_ITERATIONS_SCALE, BENCHMARK_SEED, DISPLAY_ERROR_STACKS, DISPLAY_VERBOSE_RESULTS } from './config.ts';
-import { selectUnit, type Unit } from './utils.ts';
-
-const WARMUP_ITERATIONS_RATIO = 0.1;
-
-type InputValue = unknown;
-
-type SimpleSerializer = {
-    name: string;
-    stringify(value: InputValue): string;
-    parse(json: string): InputValue;
-};
-
-type ComplexSerializer<TSerialized> = SimpleSerializer & {
-    serialize(value: InputValue): TSerialized;
-    deserialize(serialized: TSerialized): InputValue;
-    toJson(serialized: TSerialized): string;
-    fromJson(json: string): TSerialized;
-};
-
-type Serializer<TSerializer = unknown> = SimpleSerializer | ComplexSerializer<TSerializer>;
-
-export function createSerializer<TSerializer = unknown>(
-    name: string,
-    serializer: Omit<SimpleSerializer, 'name'> | Omit<ComplexSerializer<TSerializer>, 'name'>,
-): Serializer<TSerializer> {
-    return {
-        name,
-        ...serializer,
-    };
-}
-
-export type Scenario = {
-    id: string;
-    name: string;
-    description: string;
-    skipSerializers?: string[];
-    /** Number of iterations to generate for each batch. All batches will have the exact same data. */
-    iterations: number;
-    /**
-     * Number of batches to run.
-     * The rationale for batches is that too many iterations might easily not fit in memory.
-     */
-    batches?: number;
-    /** If array is returned, it will be serialized by items (we measure the total time). */
-    getData(): InputValue | InputValue[];
-};
+import { BENCHMARK_ITERATIONS_SCALE, BENCHMARK_SEED, DISPLAY_VERBOSE_RESULTS, RELATIVE_SPREAD_WARNING_THRESHOLD, WARMUP_ITERATIONS_RATIO } from './config.ts';
+import { renderStatColumn } from './format.ts';
+import { addStats, createSeededRNG, forceGc, hashString, printBenchmarkError, printWarning, relativeSpread, selectUnit, shuffleInPlace, statFromSamples, type InputValue, type Scenario, type Serializer, type Stat, type Unit } from './utils.ts';
 
 export function runScenarios(scenarios: Scenario[], serializers: Serializer[]): ScenarioResult[] {
     console.log(`Running ${scenarios.length} benchmark scenarios on ${serializers.length} serializers...`);
@@ -77,10 +33,10 @@ export type ScenarioResult = {
 function runScenario(scenario: Scenario, serializers: Serializer[]): ScenarioResult {
     const batches = scenario.batches ?? 1;
 
-    const runningResultsBySerializer: Map<string, SerializerResult[]> = new Map();
+    const runningResultsBySerializer: Map<string, SerializerBatchResult[]> = new Map();
 
-    for (let i = 0; i < batches; i++) {
-        const batchResult = runScenarioBatch(scenario, serializers);
+    for (let batchIndex = 0; batchIndex < batches; batchIndex++) {
+        const batchResult = runScenarioBatch(scenario, serializers, batchIndex);
 
         for (const serializerResult of batchResult) {
             const serializerName = serializerResult.serializer;
@@ -101,18 +57,23 @@ function runScenario(scenario: Scenario, serializers: Serializer[]): ScenarioRes
         if (!serializerResults)
             throw new Error(`No results found for serializer '${serializer.name}' in scenario '${scenario.name}'.`);
 
-        const averageResult: SerializerResult = {
+        // The median (rather than the mean) is used because it is far less sensitive to stray outliers, e.g. a GC pause or a scheduler hiccup on one batch.
+        // The error is the spread of the per-batch values around that median (0 when there's only one batch to measure from).
+        const combinedResult: SerializerResult = {
             serializer: serializer.name,
-            serializeMs: averageByKey(serializerResults, 'serializeMs'),
-            toJsonMs: averageByKey(serializerResults, 'toJsonMs'),
-            deserializeMs: averageByKey(serializerResults, 'deserializeMs'),
-            fromJsonMs: averageByKey(serializerResults, 'fromJsonMs'),
-            stringifyMs: averageByKey(serializerResults, 'stringifyMs'),
-            parseMs: averageByKey(serializerResults, 'parseMs'),
-            stringSizeBytes: averageByKey(serializerResults, 'stringSizeBytes'),
+            serializeMs: statByKey(serializerResults, 'serializeMs'),
+            toJsonMs: statByKey(serializerResults, 'toJsonMs'),
+            deserializeMs: statByKey(serializerResults, 'deserializeMs'),
+            fromJsonMs: statByKey(serializerResults, 'fromJsonMs'),
+            stringifyMs: statByKey(serializerResults, 'stringifyMs'),
+            parseMs: statByKey(serializerResults, 'parseMs'),
+            stringSizeBytes: statByKey(serializerResults, 'stringSizeBytes'),
         };
 
-        results.push(averageResult);
+        results.push(combinedResult);
+
+        if (batches > 1)
+            warnIfUnreliable(scenario.name, serializer.name, serializerResults);
     }
 
     return {
@@ -121,21 +82,32 @@ function runScenario(scenario: Scenario, serializers: Serializer[]): ScenarioRes
     };
 }
 
-function averageByKey<TKey extends string>(items: { [P in TKey]: number }[], key: TKey) {
-    const sum = items.reduce((ans, item) => ans + item[key], 0);
-    return sum / items.length;
+function statByKey<TKey extends string>(items: { [P in TKey]: number }[], key: TKey): Stat {
+    return statFromSamples(items.map(item => item[key]));
 }
 
-function runScenarioBatch(scenario: Scenario, serializers: Serializer[]): SerializerResult[] {
+function warnIfUnreliable(scenarioName: string, serializerName: string, serializerResults: SerializerBatchResult[]) {
+    const stringifySpread = relativeSpread(serializerResults.map(result => result.stringifyMs));
+    const parseSpread = relativeSpread(serializerResults.map(result => result.parseMs));
+    const worstSpread = Math.max(stringifySpread, parseSpread);
+
+    if (worstSpread > RELATIVE_SPREAD_WARNING_THRESHOLD)
+        printWarning(`Unreliable measurement for '${serializerName}' in scenario '${scenarioName}': results across batches vary by ~${(worstSpread * 100).toFixed(0)}%.`);
+}
+
+function runScenarioBatch(scenario: Scenario, serializers: Serializer[], batchIndex: number): SerializerBatchResult[] {
     const measureIterations = Math.max(1, Math.floor(scenario.iterations * BENCHMARK_ITERATIONS_SCALE));
     const warmupIterations = Math.max(1, Math.floor(measureIterations * WARMUP_ITERATIONS_RATIO));
 
     faker.seed(BENCHMARK_SEED);
     const items = Array.from({ length: measureIterations + warmupIterations }, () => scenario.getData());
 
-    const results: SerializerResult[] = [];
+    // Serializers are shuffled per batch (deterministically) so that any drift over the course of the run (thermal throttling, background load, ...) is spread evenly across all serializers instead of consistently favoring/penalizing the same ones.
+    const shuffledSerializers = shuffleInPlace([ ...serializers ], createSeededRNG(hashString(scenario.id) ^ batchIndex));
 
-    for (const serializer of serializers) {
+    const results: SerializerBatchResult[] = [];
+
+    for (const serializer of shuffledSerializers) {
         if (scenario.skipSerializers?.includes(serializer.name))
             continue;
 
@@ -146,7 +118,8 @@ function runScenarioBatch(scenario: Scenario, serializers: Serializer[]): Serial
     return results;
 }
 
-export type SerializerResult = {
+/** A single serializer's raw measurement from one batch. */
+export type SerializerBatchResult = {
     serializer: string;
     serializeMs: number;
     toJsonMs: number;
@@ -157,12 +130,27 @@ export type SerializerResult = {
     stringSizeBytes: number;
 };
 
-function measureSerializer(scenarioName: string, serializer: Serializer, items: InputValue[] | InputValue[][], warmupIterations: number): SerializerResult {
+/** A single serializer's result for a scenario, combined (with an error estimate) across all of the scenario's batches. */
+export type SerializerResult = {
+    serializer: string;
+    serializeMs: Stat;
+    toJsonMs: Stat;
+    deserializeMs: Stat;
+    fromJsonMs: Stat;
+    stringifyMs: Stat;
+    parseMs: Stat;
+    stringSizeBytes: Stat;
+};
+
+function measureSerializer(scenarioName: string, serializer: Serializer, items: InputValue[] | InputValue[][], warmupIterations: number): SerializerBatchResult {
     // The serializers should never mutate the input values. However, they might mutate the outputs (e.g., superJson uses in-place deserialization).
     // To avoid any issues, we just generate a new input for each iteration.
 
     const warmupItems = items.slice(0, warmupIterations);
     const testItems = items.slice(warmupIterations);
+
+    // A full GC before warmup starts every serializer from the same clean heap state, instead of inheriting garbage left behind by the previous one.
+    forceGc();
 
     try {
         warmUpSerializer(serializer, warmupItems);
@@ -171,7 +159,7 @@ function measureSerializer(scenarioName: string, serializer: Serializer, items: 
         // Warmup errors are not critical.
     }
 
-    const result: SerializerResult = {
+    const result: SerializerBatchResult = {
         serializer: serializer.name,
         serializeMs: NaN,
         deserializeMs: NaN,
@@ -184,17 +172,21 @@ function measureSerializer(scenarioName: string, serializer: Serializer, items: 
 
     try {
         if ('serialize' in serializer) {
+            forceGc();
             const [ serializeMs, serialized ] = measureFunction(testItems, value => serializer.serialize(value));
             result.serializeMs = serializeMs;
 
+            forceGc();
             const [ toJsonMs, json ] = measureFunction(serialized, value => serializer.toJson(value));
             result.toJsonMs = toJsonMs;
 
             result.stringSizeBytes = sumSizeBytes(json) / json.length;
 
+            forceGc();
             const [ fromJsonMs, reserialized ] = measureFunction(json, value => serializer.fromJson(value));
             result.fromJsonMs = fromJsonMs;
 
+            forceGc();
             const [ deserializeMs ] = measureFunction(reserialized, value => serializer.deserialize(value));
             result.deserializeMs = deserializeMs;
 
@@ -202,17 +194,19 @@ function measureSerializer(scenarioName: string, serializer: Serializer, items: 
             result.parseMs = result.deserializeMs + result.fromJsonMs;
         }
         else {
+            forceGc();
             const [ stringifyMs, json ] = measureFunction(testItems, value => serializer.stringify(value));
             result.stringifyMs = stringifyMs;
 
             result.stringSizeBytes = sumSizeBytes(json) / json.length;
 
+            forceGc();
             const [ parseMs ] = measureFunction(json, value => serializer.parse(value));
             result.parseMs = parseMs;
         }
     }
     catch (error) {
-        printError(`Error measuring serializer '${serializer.name}' for scenario '${scenarioName}'.`, error, true);
+        printBenchmarkError(`Error measuring serializer '${serializer.name}' for scenario '${scenarioName}'.`, error, true);
     }
 
     return result;
@@ -295,80 +289,53 @@ function getUtf8ByteLength(value: string): number {
     return new TextEncoder().encode(value).length;
 }
 
-const seenErrors = new Set<string>();
-
-function printError(message: string, error: unknown, onlyUnique = false) {
-    if (onlyUnique && seenErrors.has(message))
-        return;
-
-    seenErrors.add(message);
-
-    if (DISPLAY_ERROR_STACKS)
-        console.error(message, '\n', error);
-    else
-        console.error(message);
-}
-
 function printScenarioResults(result: ScenarioResult, serializers: Serializer[]) {
-    const timeUnit = selectUnit('time', result.results.flatMap(result => [
-        result.serializeMs,
-        result.toJsonMs,
-        result.deserializeMs,
-        result.fromJsonMs,
+    const timeUnit = selectUnit('time', result.results.flatMap(r => [
+        r.serializeMs.value,
+        r.toJsonMs.value,
+        r.deserializeMs.value,
+        r.fromJsonMs.value,
     ]));
-    const sizeUnit = selectUnit('size', result.results.map(result => result.stringSizeBytes));
+    const sizeUnit = selectUnit('size', result.results.map(r => r.stringSizeBytes.value));
+
+    const orderedResults = serializers.map(serializer => result.results.find(r => r.serializer === serializer.name));
+
+    const timeColumns = [ 'serializeMs', 'toJsonMs', 'deserializeMs', 'fromJsonMs', 'stringifyMs', 'parseMs' ] as const;
+
+    // Each column finds its own best (smallest) value across serializers - the shared best marker/coloring make that comparison visible at a glance.
+    const columns: { label: string, unit: Unit, stats: (Stat | undefined)[] }[] = [
+        ...timeColumns.map(key => ({
+            label: `${key.substring(0, key.length - 2)} (${timeUnit.label})`,
+            unit: timeUnit,
+            stats: orderedResults.map(r => r?.[key]),
+        })),
+        {
+            label: `total (${timeUnit.label})`,
+            unit: timeUnit,
+            stats: orderedResults.map(r => r && addStats(r.stringifyMs, r.parseMs)),
+        },
+        {
+            label: `size (${sizeUnit.label})`,
+            unit: sizeUnit,
+            stats: orderedResults.map(r => r?.stringSizeBytes),
+        },
+    ];
+
+    const renderedColumns = columns.map(column => renderStatColumn(column.stats, column.unit));
 
     const table = new Table({
-        head: [
-            'serializer',
-            'serialize',
-            'toJson',
-            'deserialize',
-            'fromJson',
-            'stringify',
-            'parse',
-            `total (${timeUnit.label})`,
-            `size (${sizeUnit.label})`,
-        ],
+        head: [ 'serializer', ...columns.map(column => column.label) ],
         style: {
             head: [ 'white', 'bold' ],
             border: [ 'white' ],
         },
     });
 
-    table.push(...serializers.map(serializer => mapSerializerResultToTableRow(serializer, result.results, timeUnit, sizeUnit)));
+    serializers.forEach((serializer, index) => {
+        table.push([ serializer.name, ...renderedColumns.map(column => column[index]!) ]);
+    });
 
     process.stdout.write(table.toString());
     process.stdout.write('\n');
 }
 
-function mapSerializerResultToTableRow(serializer: Serializer, results: SerializerResult[], timeUnit: Unit, sizeUnit: Unit) {
-    const result = results.find(r => r.serializer === serializer.name);
-    if (!result) {
-        return [
-            serializer.name,
-            '-',
-            '-',
-            '-',
-            '-',
-            '-',
-            '-',
-            '-',
-            '-',
-        ];
-    }
-
-    const totalMs = result.stringifyMs + result.parseMs;
-
-    return [
-        result.serializer,
-        timeUnit.format(result.serializeMs),
-        timeUnit.format(result.toJsonMs),
-        timeUnit.format(result.deserializeMs),
-        timeUnit.format(result.fromJsonMs),
-        timeUnit.format(result.stringifyMs),
-        timeUnit.format(result.parseMs),
-        timeUnit.format(totalMs),
-        sizeUnit.format(result.stringSizeBytes),
-    ];
-}

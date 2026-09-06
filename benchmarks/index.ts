@@ -1,84 +1,37 @@
-import { faker } from '@faker-js/faker';
-import { type Scenario, runScenarios } from './measure.ts';
-import { exampleScenario } from './scenarios/example.ts';
-import { realisticApiCallScenario } from './scenarios/realisticApiCall.ts';
-import { smallPayloadBurstScenario } from './scenarios/smallPayloadBurst.ts';
-import { sharedReferencesScenario } from './scenarios/sharedReferences.ts';
-import { circularReferencesScenario } from './scenarios/circularReferences.ts';
-import { repeatedTemporalValuesScenario } from './scenarios/repeatedTemporalValues.ts';
-import { mixedExtendedTypesScenario } from './scenarios/mixedExtendedTypes.ts';
-import { printComparisonTables, type ComparisonGroup, type ComparisonMetric } from './aggregate.ts';
-import { REFERENCE_DATE } from './config.ts';
-import { devalueSerializer, jsonSerializer, nextJsonSerializer, serializeJavascriptSerializer, superJsonSerializer, powerJsonSerializer } from './serializers.ts';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { buildPinnedCommand } from './pin.ts';
 
-function main() {
-    faker.setDefaultRefDate(REFERENCE_DATE);
+type Runtime = 'bun' | 'node';
 
-    const scenarios = createScenarios();
-    const serializers = createSerializers();
+// One command per supported runtime, rather than just re-using whichever executable ran this script - that way the
+// runtime-specific flags it needs (e.g. Node's `--expose-gc`, so `forceGc()` can actually force a GC cycle) are never missed.
+const RUNTIME_COMMANDS: Record<Runtime, (mainScript: string) => string[]> = {
+    bun: mainScript => [ 'bun', 'run', mainScript ],
+    node: mainScript => [ 'node', '--expose-gc', mainScript ],
+};
 
-    const scenarioResults = runScenarios(scenarios, serializers);
-    printComparisonTables(scenarioResults, comparisonGroups, comparisonMetrics);
+const mainScript = fileURLToPath(new URL('./main.ts', import.meta.url));
+
+const [ runtime, forwardedArgs ] = parseArgs(process.argv.slice(2));
+console.log(`Running benchmarks under ${runtime}.`);
+
+const baseCommand = [ ...RUNTIME_COMMANDS[runtime](mainScript), ...forwardedArgs ];
+
+const [ executable, ...args ] = buildPinnedCommand(baseCommand[0]!, baseCommand.slice(1));
+
+const child = spawn(executable, args, { stdio: 'inherit' });
+child.on('exit', (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+
+/** The first CLI argument selects the runtime (defaulting to whichever one is running this script); the rest are forwarded to main.ts. */
+function parseArgs(argv: string[]): [Runtime, string[]] {
+    const [ first, ...rest ] = argv;
+    if (first === 'bun' || first === 'node')
+        return [ first, rest ];
+
+    return [ defaultRuntime(), argv ];
 }
 
-function createScenarios(): Scenario[] {
-    return [
-        exampleScenario(),
-
-        realisticApiCallScenario(), // Already better
-
-        smallPayloadBurstScenario(), // Already better
-        sharedReferencesScenario(), // We should lower the size. Deduplicated is larger than superjson's deduplicated.
-
-        // This is actually a bug in superJson.
-        // Their serializer caches transformed results for all objects it sees. If it sees the same object again, it will either return a reference (if `dedupe: true`) or the cached result.
-        // However, if `dedupe: false`, serialization depends on the path to the object - because the path is used to break cycles. So, an object like `a: { b: { c: a } }` should break the cycle when encountering `a` for the second time, while the same cycle but starting from `b` should break the cycle at `b`.
-        // PowerJson always expands the objects as deep as possible, which results in an exponential growth on this specific scenario. Nevertheless, this is a very artificial scenario. In this case, the only reasonable way is to deduplicate - in which case, unfortunately, superJson throws an error.
-        circularReferencesScenario(),
-
-        repeatedTemporalValuesScenario(),
-        mixedExtendedTypesScenario(),
-    ];
+function defaultRuntime(): Runtime {
+    return typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined' ? 'bun' : 'node';
 }
-
-function createSerializers() {
-    return [
-        jsonSerializer(),
-
-        powerJsonSerializer({ deduplicate: false }),
-        powerJsonSerializer({ deduplicate: true }),
-
-        superJsonSerializer({ dedupe: false }),
-        superJsonSerializer({ dedupe: true }),
-
-        devalueSerializer(),
-
-        serializeJavascriptSerializer(),
-
-        nextJsonSerializer(),
-    ];
-}
-
-const comparisonGroups: ComparisonGroup[] = [ {
-    serializers: [ 'powerjson-simple', 'superjson-default' ],
-}, {
-    serializers: [ 'powerjson-deduplicate', 'superjson-dedupe' ],
-}, {
-    serializers: [ 'powerjson-simple', 'powerjson-deduplicate', 'superjson-default', 'superjson-dedupe', 'devalue', 'serialize-javascript', 'next-json' ],
-} ];
-
-const comparisonMetrics: ComparisonMetric[] = [ {
-    id: 'stringify',
-    unitType: 'time',
-    value: result => result.stringifyMs,
-}, {
-    id: 'parse',
-    unitType: 'time',
-    value: result => result.parseMs,
-}, {
-    id: 'size',
-    unitType: 'size',
-    value: result => result.stringSizeBytes,
-} ];
-
-main();

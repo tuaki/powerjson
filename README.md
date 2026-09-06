@@ -6,11 +6,11 @@ Serialize any JavaScript object to pure JSON and back, including built-in types,
 
 JSON has its limitations. Many libraries try to overcome them by extending its grammar or inventing elaborate serialization schemas. Unlike them, we want to keep the simplicity and human-readability of JSON while extending its capabilities.
 
-PowerJson is heavily inspired by [SuperJSON](https://github.com/ravionhq/superjson#getting-started). It's a great library with the same goals as PowerJson, but it has [some design flaws](./docs/superjson-limitations.md) that lead to worse performance, less readable output, and even bugs in some edge cases. PowerJson is an attempt to fix these issues and provide a better alternative to SuperJSON. Additional differences between the two libraries are described [here](./docs/advanced-topics.md).
+PowerJson is heavily inspired by [SuperJSON](https://github.com/ravionhq/superjson#getting-started). It's a great library with the same goals as PowerJson, but it has [some design flaws](./docs/superjson-limitations.md) that lead to worse performance, less readable output, and even bugs in some edge cases. PowerJson is an attempt to fix these issues and provide a better alternative to SuperJSON. Check out [all differences](./docs/advanced-topics.md).
 
 ## Basic usage
 
-You can use PowerJson as a drop-in replacement for `JSON.stringify` and `JSON.parse`. It has the a similar API, but it can handle many more types of values:
+You can use PowerJson as a drop-in replacement for `JSON.stringify` and `JSON.parse`. It has a similar API, but it can handle many more types of values:
 
 ```ts
 import { PowerJson } from 'powerjson';
@@ -103,8 +103,8 @@ const dateTimeTransformer = transformer({
     type: 'DateTime',
     serialize: value => value.toISO()!,
     deserialize: value => DateTime.fromISO(value, { setZone: true }),
-    isEntity: false,    // Referential equalities won't be preserved for this type (in the deduplication mode).
-    isComposite: false, // The type won't be serialized to an array (or, if it will, it won't use type annotations for its properties).
+    isEntity: false,    // Referential equalities won't be preserved for this type.
+    isComposite: false, // The type won't be serialized to an array.
 });
 
 const powerJson = new PowerJson({ transformers: [ dateTimeTransformer ] });

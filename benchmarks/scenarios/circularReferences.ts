@@ -1,10 +1,14 @@
-import type { Scenario } from '../measure.ts';
+import type { Scenario } from '../utils.ts';
 
 export function circularReferencesScenario(): Scenario {
     return {
         id: 'circular-references',
         name: 'Circular References',
         description: 'A cyclic object graph with arrays, sets, and maps referencing each other.',
+        // There is actually a bug in superJson. (Another one ... I know, right?)
+        // Their serializer caches transformed results for all objects it sees. If it sees the same object again, it will either return a reference (if `dedupe: true`) or the cached result.
+        // However, if `dedupe: false`, serialization depends on the path to the object - because the path is used to break cycles. So, an object like `a: { b: { c: a } }` should break the cycle when encountering `a` for the second time, while the same cycle but starting from `b` should break the cycle at `b`.
+        // PowerJson always expands the objects as deep as possible, which results in an exponential growth on this specific scenario. Nevertheless, this is a very artificial scenario. In this case, the only reasonable way is to deduplicate - in which case, unfortunately, superJson throws an error.
         skipSerializers: [ 'JSON', 'uberson-simple' ],
         iterations: 100,
         batches: 100,

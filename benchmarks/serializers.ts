@@ -1,9 +1,9 @@
-import { createSerializer } from './measure.ts';
 import { PowerJson } from '../src/powerJson.ts';
 import SuperJson from 'superjson';
 import * as devalue from 'devalue';
 import serializeJavascript from 'serialize-javascript';
 import { NJSON } from 'next-json';
+import { createSerializer } from './utils.ts';
 
 export function jsonSerializer() {
     return createSerializer('JSON', {

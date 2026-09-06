@@ -33,10 +33,18 @@ bun run lint
 Run the benchmark scenarios with:
 
 ```sh
-bun run benchmark
+bun run --expose-gc benchmarks/index.ts
+node --expose-gc benchmarks/index.ts
 ```
 
 Benchmark inputs are deterministic through the seed and reference date in `benchmarks/config.ts`. Change `BENCHMARK_ITERATIONS_SCALE` there to increase the sample size when investigating performance; use values of at least `1` for meaningful comparisons. Avoid treating an individual benchmark run as conclusive because runtime noise can affect results.
+
+For better results, benchmarks try to use `nice` to increase the process priority. This usually requires either root privileges or editing `/etc/security/limits.conf`. Also, `taskset` is used to pin the process to a single CPU core. Use `BENCHMARK_CPU` to override the default core selection (e.g., if you want to run multiple benchmarks in parallel). Combined together:
+
+```sh
+sudo BENCHMARK_CPU=0 bun run --expose-gc benchmarks/index.ts
+sudo BENCHMARK_CPU=1 node --expose-gc benchmarks/index.ts
+```
 
 ## Building and packaging
 
