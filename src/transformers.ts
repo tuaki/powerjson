@@ -79,8 +79,11 @@ type Clazz<T> = {
     name: string;
 };
 
-/** Utility function for defining transformers. */
-export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(config: {
+/**
+ * Utility function for defining transformers.
+ * Automatically infers the types of `TObject` and `TJson` from the provided functions.
+ */
+export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(options: {
     clazz: Clazz<TObject>;
     type: TypeId | undefined;
     serialize: (value: TObject, serializer: Serializer) => TJson | undefined;
@@ -91,7 +94,7 @@ export function transformer<TObject extends ObjectLike, TJson extends JsonValue>
     return {
         isEntity: false,
         isComposite: false,
-        ...config,
+        ...options,
     };
 }
 

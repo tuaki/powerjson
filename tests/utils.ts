@@ -34,7 +34,7 @@ export class Tester {
     }
 
     static addVersionToSerialized(serializer: PowerJson, serialized: JsonObject): JsonObject {
-        const version = serializer.deduplicate ? 2 : 1;
+        const version = serializer.config.version;
 
         return {
             ...serialized,
@@ -91,7 +91,7 @@ export function testSerializeDeserialize(serializer: PowerJson, input: unknown, 
     const deserialized = serializer.deserialize(parsed);
     expect(deserialized).toStrictEqual(input);
 
-    if (serializer.deduplicate)
+    if (serializer.config.deduplicate)
         testIdentityEqualities(input, deserialized);
     // NICE_TO_HAVE else check the identities but only for circular references ?.
 }

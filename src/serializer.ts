@@ -1,14 +1,12 @@
 import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
 import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike } from './transformers.ts';
-import type { PowerJson } from './powerJson.ts';
+import type { PowerJsonConfig } from './config.ts';
 
 export abstract class Serializer {
-    readonly powerJson: PowerJson;
-    readonly version: number;
+    readonly config: PowerJsonConfig;
 
-    constructor(powerJson: PowerJson, version: number) {
-        this.powerJson = powerJson;
-        this.version = version;
+    constructor(config: PowerJsonConfig) {
+        this.config = config;
     }
 
     serialize(value: unknown): RootJsonObject {
@@ -24,7 +22,7 @@ export abstract class Serializer {
             annotations = {};
             serialized[ESCAPE_CHAR] = annotations;
         }
-        annotations[ESCAPE_CHAR] = this.version;
+        annotations[ESCAPE_CHAR] = this.config.version;
 
         if (isWrapped)
             (annotations as RootAnnotations)[WRAPPED_DIRECTIVE] = true;
@@ -218,7 +216,7 @@ export abstract class Serializer {
     }
 
     private serializeObjectLike(value: ObjectLike): JsonValue | undefined {
-        const transformer = this.powerJson.getTransformerForObject(value);
+        const transformer = this.config.getTransformerForObject(value);
 
         if (transformer.isComposite && this.compositeIndex === undefined)
             this.compositeIndex = 0;

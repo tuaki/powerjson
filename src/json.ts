@@ -5,16 +5,17 @@ export type JsonObject = { [key: string]: JsonValue };
 export type JsonArray = JsonValue[];
 export type JsonMap = [JsonValue, JsonValue][];
 
+export type AlgorithmVersion = 1 | 2;
+
 export type TypeId = string;
 export type EntityId = number;
-export type VersionId = number;
 
 export type Annotation = TypeId | EntityId | [TypeId, EntityId];
 export type CompositeAnnotation = Record<number, Annotation>;
 
 /** The wrapped directive can be only on the root. No need to check for it elsewhere. */
 export type Annotations = Record<string, Annotation | CompositeAnnotation>;
-export type RootAnnotations = Annotations & { [ESCAPE_CHAR]: VersionId, [WRAPPED_DIRECTIVE]?: true };
+export type RootAnnotations = Annotations & { [ESCAPE_CHAR]: AlgorithmVersion, [WRAPPED_DIRECTIVE]?: true };
 
 export type AnnotatedJsonObject = JsonObject & { [ESCAPE_CHAR]?: Annotations };
 export type RootJsonObject = JsonObject & { [ESCAPE_CHAR]: RootAnnotations };

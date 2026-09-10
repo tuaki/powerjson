@@ -1,12 +1,16 @@
-import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type RootJsonObject, type TypeId } from './json.ts';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AlgorithmVersion, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type RootJsonObject, type TypeId } from './json.ts';
 import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.ts';
-import type { PowerJson } from './powerJson.ts';
+import type { PowerJsonConfig } from './config.ts';
+
+export function getAlgorithmVersion(value: RootJsonObject): AlgorithmVersion {
+    return value[ESCAPE_CHAR][ESCAPE_CHAR];
+}
 
 export abstract class Deserializer {
-    readonly powerJson: PowerJson;
+    readonly config: PowerJsonConfig;
 
-    constructor(powerJson: PowerJson) {
-        this.powerJson = powerJson;
+    constructor(config: PowerJsonConfig) {
+        this.config = config;
     }
 
     deserialize(value: RootJsonObject): unknown {
@@ -187,7 +191,7 @@ export abstract class Deserializer {
             case BIGINT_ANNOTATION:
                 return BigInt(value as string);
             default: {
-                const transformer = this.powerJson.getTransformerForType(typeId);
+                const transformer = this.config.getTransformerForType(typeId);
                 return transformer.deserialize(value, this);
             }
         }

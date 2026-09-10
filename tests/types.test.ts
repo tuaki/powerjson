@@ -225,7 +225,7 @@ describe('special objects', () => {
 
     test.each(forbiddenObjectKeys)('deserialization rejects forbidden key %s', forbiddenKey => {
         tester.forEach(serializer => {
-            const version = serializer.deduplicate ? 2 : 1;
+            const version = serializer.config.version;
             const inputJson = `{ "$": { "$": ${version} }, "${forbiddenKey}": 1 }`;
 
             expect(() => serializer.parse(inputJson)).toThrowError(new RegExp(forbiddenKey));

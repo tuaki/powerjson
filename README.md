@@ -49,9 +49,11 @@ const jsonString = PowerJson.stringify(data, 4);
 const parsedData = PowerJson.parse(jsonString);
 ```
 
-### `serialize` & `deserialize`
+### API
 
-Use these functions to convert between JavaScript values and PowerJson's JSON-compatible representation without converting to a string. This is useful for, e.g., passing the data to a database which does it's own stringification.
+Use the `serialize` & `deserialize` functions to convert between JavaScript values and PowerJson's JSON-compatible representation without converting to a string. This is useful for, e.g., passing the data to a database which does it's own stringification. These functions are available both as methods on `PowerJson` and as standalone functions (for tree shaking).
+
+Besides this (and some utility functions), the API is intentionally kept minimal. If you feel like something is missing, please communicate your use case in an issue.
 
 ### TypeScript
 

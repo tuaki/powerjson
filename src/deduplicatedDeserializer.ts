@@ -23,7 +23,7 @@ export class DeduplicatedDeserializer extends Deserializer {
     private sortObjectKeys!: SortObjectKeysOption;
 
     override deserialize(value: RootJsonObject) {
-        this.sortObjectKeys = this.powerJson.sortObjectKeys;
+        this.sortObjectKeys = this.config.sortObjectKeys;
 
         if (this.sortObjectKeys === 'catch') {
             try {
