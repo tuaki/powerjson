@@ -1,8 +1,9 @@
 import { RELATIVE_CLOSE_TO_BEST_THRESHOLD } from './config.ts';
 import type { Stat, Unit } from './utils.ts';
 
-/** Marks the best (smallest) value in a compared set of values. */
-export const BEST_MARKER = '●';
+export function colorBold(value: string): string {
+    return `\u001b[1m${value}\u001b[22m`;
+}
 
 export function colorGreen(value: string): string {
     return `\u001b[32m${value}\u001b[0m`;
@@ -17,45 +18,23 @@ export function colorRed(value: string): string {
 }
 
 /** Whether `value` is (approximately) equal to `reference` - used to identify the actual source of a "best" value. */
-export function isApproximatelyEqual(value: number, reference: number): boolean {
+function isApproximatelyEqual(value: number, reference: number): boolean {
     if (!Number.isFinite(value) || !Number.isFinite(reference))
         return false;
 
-    return Math.abs((value - reference) / reference) <= 1e-4;
+    return Math.abs((value - reference) / reference) <= 1e-3;
 }
 
 /** Whether `value` is close enough to `best` to still be highlighted, even though it isn't the best itself. */
-export function isCloseToBest(value: number, best: number): boolean {
+function isCloseToBest(value: number, best: number): boolean {
     if (!Number.isFinite(value) || !Number.isFinite(best) || best === 0)
         return isApproximatelyEqual(value, best);
 
     return (value - best) / Math.abs(best) <= RELATIVE_CLOSE_TO_BEST_THRESHOLD;
 }
 
-/**
- * Formats every value in a set of comparable Stats (same unit) relative to the smallest one:
- * - the smallest is shown in full (its absolute value +- error, marked and colored),
- * - every other one as "how many times worse than the best" ratio
- * Values within `RELATIVE_CLOSE_TO_BEST_THRESHOLD` of the best are colored green as well.
- */
-export function renderStatColumn(stats: (Stat | undefined)[], unit: Unit): string[] {
-    const bestIndex = findBestIndex(stats);
-
-    return stats.map((stat, index) => {
-        if (!stat || !Number.isFinite(stat.value))
-            return colorRed('-');
-
-        const best = stats[bestIndex!]!;
-
-        if (index === bestIndex)
-            return colorBrightGreen(`${BEST_MARKER} ${formatAbsoluteStat(stat, unit)}`);
-
-        const text = formatRatioStat(stat, best, unit);
-        return isCloseToBest(stat.value, best.value) ? colorGreen(text) : text;
-    });
-}
-
-function findBestIndex(stats: (Stat | undefined)[]): number | undefined {
+/** Finds the smallest finite value in a set of Stats. */
+export function findBestStat(stats: (Stat | undefined)[]): Stat | undefined {
     let bestIndex: number | undefined;
     let bestValue = Infinity;
 
@@ -66,10 +45,18 @@ function findBestIndex(stats: (Stat | undefined)[]): number | undefined {
         }
     });
 
-    return bestIndex;
+    return bestIndex === undefined ? undefined : stats[bestIndex];
 }
 
-/** Formats a Stat's absolute value (scaled by `unit`), rounded to no more precision than its error justifies. Sizes are exact (no sampling error), so no error is ever shown for them. */
+/** Formats the exact absolute best value; best columns intentionally never show an error estimate. */
+export function formatBestStat(stat: Stat | undefined, unit: Unit): string {
+    if (!stat || !Number.isFinite(stat.value))
+        return colorRed('NaN');
+
+    return (stat.value / unit.divisor).toFixed(3);
+}
+
+/** Formats a Stat's absolute value (scaled by `unit`), rounded to no more precision than its error justifies. */
 export function formatAbsoluteStat(stat: Stat, unit: Unit): string {
     const value = stat.value / unit.divisor;
 
@@ -82,7 +69,7 @@ export function formatAbsoluteStat(stat: Stat, unit: Unit): string {
 }
 
 /** Formats `stat` as a ratio relative to `best` (e.g. "2.13" for "2.13 times worse"), with its own error propagated from both Stats. */
-export function formatRatioStat(stat: Stat, best: Stat, unit: Unit): string {
+function formatRatioStat(stat: Stat, best: Stat, unit: Unit): string {
     const ratio = stat.value / best.value;
 
     if (unit.type === 'size' || !Number.isFinite(stat.error) || !Number.isFinite(best.error))
@@ -94,6 +81,29 @@ export function formatRatioStat(stat: Stat, best: Stat, unit: Unit): string {
 
     const decimals = decimalsForError(ratioError);
     return `${ratio.toFixed(decimals)} ± ${ratioError.toFixed(decimals)}`;
+}
+
+/**
+ * Renders one comparison cell:
+ * - the best value within the compared group is shown in full (absolute value +- error, marked)
+ * - every other one is shown as a ratio relative to that group's best.
+ * - cells close to the group's best are colored green
+ * - bright green if that group best also happens to be the best across every serializer (`bestGlobal`), not just the group
+ */
+export function renderRelativeCell(stat: Stat | undefined, unit: Unit, bestCompared: Stat | undefined, bestGlobal: Stat | undefined): string {
+    if (!stat || !bestCompared)
+        return '-';
+
+    if (!Number.isFinite(stat.value))
+        return colorRed('NaN');
+
+    const text = formatRatioStat(stat, bestCompared, unit);
+
+    if (!isCloseToBest(stat.value, bestCompared.value))
+        return text;
+
+    const isGlobalBest = bestGlobal && isApproximatelyEqual(stat.value, bestGlobal.value);
+    return isGlobalBest ? colorBrightGreen(text) : colorGreen(text);
 }
 
 /** Progressive-precision fallback for ratios with no usable error estimate (e.g. a single-batch scenario). */

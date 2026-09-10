@@ -13,7 +13,7 @@ export function jsonSerializer() {
 }
 
 export function powerJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
-    const name = `powerjson-${deduplicate ? 'deduplicate' : 'simple'}`;
+    const name = `powerjson v${deduplicate ? '2' : '1'}`;
     const powerJson = new PowerJson({ deduplicate });
 
     return createSerializer(name, {
@@ -26,10 +26,10 @@ export function powerJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
     });
 }
 
-export function superJsonSerializer({ dedupe }:{ dedupe: boolean }) {
+export function superJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
     // https://github.com/ravionhq/superjson
-    const name = `superjson-${dedupe ? 'dedupe' : 'default'}`;
-    const superJson = new SuperJson({ dedupe });
+    const name = `superjson v${deduplicate ? '2' : '1'}`;
+    const superJson = new SuperJson({ dedupe: deduplicate });
 
     return createSerializer(name, {
         stringify: value => superJson.stringify(value),

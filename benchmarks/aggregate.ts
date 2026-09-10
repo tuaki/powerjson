@@ -1,6 +1,6 @@
 import Table from 'cli-table3';
 import type { ScenarioResult, SerializerResult } from './measure.ts';
-import { colorRed, formatAbsoluteStat, formatRatioStat, isApproximatelyEqual, isCloseToBest, BEST_MARKER, colorBrightGreen, colorGreen } from './format.ts';
+import { formatBestStat, colorBold, renderRelativeCell } from './format.ts';
 import { selectUnit, type Stat, type Unit, type UnitType } from './utils.ts';
 
 export type ComparisonMetric = {
@@ -31,8 +31,10 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup)
 
     const columns = [ 'scenario' ];
     for (let metricIndex = 0; metricIndex < metrics.length; metricIndex++) {
-        for (let serializerIndex = 0; serializerIndex < group.serializers.length; serializerIndex++)
-            columns.push(`${String.fromCharCode('A'.charCodeAt(0) + serializerIndex)} ${metricIndex + 1}`);
+        const metric = metrics[metricIndex]!;
+        const unit = unitsByMetric.get(metric.id)!;
+        columns.push(`Best (${unit.label})`);
+        columns.push(...group.serializers);
     }
 
     const rows = results.map(result => {
@@ -47,10 +49,12 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup)
             const bestCompared = bestComparedByMetric.get(metric.id)!;
             const bestGlobal = bestGlobalByMetric.get(metric.id)!;
 
+            row.push(formatBestStat(bestCompared, unit));
+
             for (const serializerName of group.serializers) {
                 const serializerResult = bySerializer.get(serializerName);
                 const stat = serializerResult && metric.value(serializerResult);
-                row.push(renderComparedCell(stat, unit, bestCompared, bestGlobal));
+                row.push(renderRelativeCell(stat, unit, bestCompared, bestGlobal));
             }
         }
 
@@ -59,19 +63,21 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup)
 
     console.log('');
 
-    const groupLabel = group.label ?? group.serializers.join(' vs ');
-    console.log(`Comparison: ${groupLabel}`);
-
-    const metricsLabel = metrics.map(metric => `${metric.label ?? metric.id} (${unitsByMetric.get(metric.id)!.label})`).join(', ');
-    console.log(`Metrics: ${metricsLabel}`);
-
     const table = new Table({
-        head: columns,
+        // There is no head - we need to create a custom header because we want the multi-column metrics first.
         style: {
-            head: [ 'white', 'bold' ],
             border: [ 'white' ],
         },
     });
+
+    table.push([
+        { content: '', colSpan: 1 },
+        ...metrics.map(metric => ({
+            content: colorBold(metric.label ?? metric.id),
+            colSpan: group.serializers.length + 1,
+        })),
+    ]);
+    table.push(columns.map(column => colorBold(column)));
 
     table.push(...rows);
 
@@ -115,28 +121,4 @@ function findMetricBestForSerializers(results: SerializerResult[], metric: Compa
         .filter(stat => Number.isFinite(stat.value));
 
     return stats.length > 0 ? stats.reduce((best, stat) => stat.value < best.value ? stat : best) : undefined;
-}
-
-/**
- * Renders one comparison cell:
- * - the best value within the compared group is shown in full (absolute value +- error, marked)
- * - every other one is shown as a ratio relative to that group's best.
- * - cells close to the group's best are colored green
- * - bright green if that group best also happens to be the best across every serializer (`bestGlobal`), not just the group
- */
-function renderComparedCell(stat: Stat | undefined, unit: Unit, bestCompared: Stat | undefined, bestGlobal: Stat | undefined): string {
-    if (!stat)
-        return '-';
-
-    if (!Number.isFinite(stat.value))
-        return colorRed('-');
-
-    if (!bestCompared || !isCloseToBest(stat.value, bestCompared.value))
-        return bestCompared ? formatRatioStat(stat, bestCompared, unit) : '-';
-
-    const isGroupBest = isApproximatelyEqual(stat.value, bestCompared.value);
-    const text = isGroupBest ? `${BEST_MARKER} ${formatAbsoluteStat(stat, unit)}` : formatRatioStat(stat, bestCompared, unit);
-    const isGlobalBest = bestGlobal !== undefined && isApproximatelyEqual(stat.value, bestGlobal.value);
-
-    return isGlobalBest ? colorBrightGreen(text) : colorGreen(text);
 }

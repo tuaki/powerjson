@@ -2,11 +2,17 @@
 
 Serialize any JavaScript object to pure JSON and back, including built-in types, custom classes, circular references, and more.
 
+- Zero dependencies
+- Human-readable output, consistent across versions
+- Pure JSON, no custom grammar
+- Reliable, well-tested
+- [Fastest](./docs/benchmarks.md)
+
 ## Why PowerJson?
 
 JSON has its limitations. Many libraries try to overcome them by extending its grammar or inventing elaborate serialization schemas. Unlike them, we want to keep the simplicity and human-readability of JSON while extending its capabilities.
 
-PowerJson is heavily inspired by [SuperJSON](https://github.com/ravionhq/superjson#getting-started). It's a great library with the same goals as PowerJson, but it has [some design flaws](./docs/superjson-limitations.md) that lead to worse performance, less readable output, and even bugs in some edge cases. PowerJson is an attempt to fix these issues and provide a better alternative to SuperJSON. Check out [all differences](./docs/advanced-topics.md).
+PowerJson is heavily inspired by [SuperJSON](https://github.com/ravionhq/superjson#getting-started). It's a great library with the same goals as PowerJson, but it has [some design flaws](./docs/superjson-limitations.md) that lead to worse performance, less readable output, and even bugs in some edge cases. PowerJson is an attempt to fix these issues and provide a better alternative to SuperJSON. Check out [all differences](./docs/advanced-topics.md) and a [performance comparison](./docs/benchmarks.md#results).
 
 ## Basic usage
 
@@ -69,27 +75,27 @@ const powerJson = new PowerJson({ deduplicate: true });
 These types are supported by PowerJson (so far). More types will be added as they become part of the standard JavaScript API (e.g., `Temporal`).
 
 | type                                                                                       | supported by standard JSON? | supported by PowerJson? |
-| ------------------------------------------------------------------------------------------ | --------------------------- | ---------------------- |
-| `string`                                                                                   | ✅                          | ✅                     |
-| `number`                                                                                   | ⚠️ (1.)                     | ✅                     |
-| `boolean`                                                                                  | ✅                          | ✅                     |
-| `null`                                                                                     | ✅                          | ✅                     |
-| `Array`                                                                                    | ✅                          | ✅                     |
-| `Object`                                                                                   | ✅                          | ✅                     |
-| `undefined`                                                                                | ❌                          | ✅                     |
-| `bigint`                                                                                   | ❌                          | ✅                     |
-| `symbol`                                                                                   | ❌                          | ❌ (2.) TODO           |
-| `Set`                                                                                      | ❌                          | ✅                     |
-| `Map`                                                                                      | ❌                          | ✅                     |
-| `Date`                                                                                     | ❌                          | ✅                     |
-| `Temporal`                                                                                 | ❌                          | ❌ TODO                |
-| `RegExp`                                                                                   | ❌                          | ✅                     |
-| `URL`                                                                                      | ❌                          | ✅                     |
-| `Error`                                                                                    | ❌                          | ❌ TODO                |
-| [Typed arrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Typed_arrays) | ❌                          | ✅                     |
+| ------------------------------------------------------------------------------------------ | --------------------------- | ----------------------- |
+| `string`                                                                                   | ✅                          | ✅                      |
+| `number`                                                                                   | ⚠️ (1.)                     | ✅                      |
+| `boolean`                                                                                  | ✅                          | ✅                      |
+| `null`                                                                                     | ✅                          | ✅                      |
+| `Array`                                                                                    | ✅                          | ✅                      |
+| `Object`                                                                                   | ✅                          | ✅                      |
+| `undefined`                                                                                | ❌                          | ✅                      |
+| `bigint`                                                                                   | ❌                          | ✅                      |
+| `symbol`                                                                                   | ❌                          | ❌ (2.) TODO            |
+| `Set`                                                                                      | ❌                          | ✅                      |
+| `Map`                                                                                      | ❌                          | ✅                      |
+| `Date`                                                                                     | ❌                          | ✅                      |
+| `Temporal`                                                                                 | ❌                          | ❌ TODO                 |
+| `RegExp`                                                                                   | ❌                          | ✅                      |
+| `URL`                                                                                      | ❌                          | ✅                      |
+| `Error`                                                                                    | ❌                          | ❌ TODO                 |
+| [Typed arrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Typed_arrays) | ❌                          | ✅                      |
 
 1. Some values (`NaN`, `Infinity`, `-Infinity`, and `-0`) are missing.
-2. Needs to be registered (see below).
+2. Needs to be registered (see below). Also, only values are supported, not object keys.
 
 ### Custom classes
 
@@ -107,7 +113,8 @@ const dateTimeTransformer = transformer({
     isComposite: false, // The type won't be serialized to an array.
 });
 
-const powerJson = new PowerJson({ transformers: [ dateTimeTransformer ] });
+// Use the same PowerJson instance everywhere in your codebase.
+export const powerJson = new PowerJson({ transformers: [ dateTimeTransformer ] });
 ```
 
 See [custom tests](./tests/custom.test.ts) for more examples.
@@ -115,3 +122,13 @@ See [custom tests](./tests/custom.test.ts) for more examples.
 ### Symbols
 
 TODO
+
+## Non-goals
+
+Some things are just not worth the effort. We don't plan to support:
+
+- Functions, any kind of executable code, etc. If you still think you need this, just don't.
+- Sparse arrays (e.g., `new Array(3)` or `[ 1, , 3 ]`). All holes will be replaced with `undefined`.
+- Non-numeric properties of arrays, symbol properties of objects. They will be ignored.
+- Build-in types (e.g., `Set`, `Date`) across different realms (e.g., iframes, web workers). Only the same realm's instances will be serialized correctly.
+- Type validation. Just use [Zod](https://zod.dev/).

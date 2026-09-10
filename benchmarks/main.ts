@@ -8,7 +8,7 @@ import { circularReferencesScenario } from './scenarios/circularReferences.ts';
 import { repeatedTemporalValuesScenario } from './scenarios/repeatedTemporalValues.ts';
 import { mixedExtendedTypesScenario } from './scenarios/mixedExtendedTypes.ts';
 import { printComparisonTables, type ComparisonGroup, type ComparisonMetric } from './aggregate.ts';
-import { REFERENCE_DATE } from './config.ts';
+import { ONLY_EXAMPLE_SCENARIO, REFERENCE_DATE } from './config.ts';
 import { devalueSerializer, jsonSerializer, nextJsonSerializer, serializeJavascriptSerializer, superJsonSerializer, powerJsonSerializer } from './serializers.ts';
 
 function main() {
@@ -22,8 +22,9 @@ function main() {
 }
 
 function createScenarios() {
-    return [
+    return ONLY_EXAMPLE_SCENARIO ? [
         exampleScenario(),
+    ] : [
         realisticApiCallScenario(),
         smallPayloadBurstScenario(),
         sharedReferencesScenario(),
@@ -38,8 +39,8 @@ function createSerializers() {
         jsonSerializer(),
         powerJsonSerializer({ deduplicate: false }),
         powerJsonSerializer({ deduplicate: true }),
-        superJsonSerializer({ dedupe: false }),
-        superJsonSerializer({ dedupe: true }),
+        superJsonSerializer({ deduplicate: false }),
+        superJsonSerializer({ deduplicate: true }),
         devalueSerializer(),
         serializeJavascriptSerializer(),
         nextJsonSerializer(),
@@ -60,22 +61,22 @@ const allMetrics: ComparisonMetric[] = [ {
     value: result => result.stringSizeBytes,
 } ];
 
-const allSerializers = [ 'powerjson-simple', 'powerjson-deduplicate', 'superjson-default', 'superjson-dedupe', 'devalue', 'serialize-javascript', 'next-json' ];
+const nonJsonSerializers = [ 'powerjson v1', 'powerjson v2', 'superjson v1', 'superjson v2', 'devalue', 'serialize-javascript', 'next-json' ];
 
 const comparisonGroups: ComparisonGroup[] = [ {
-    serializers: [ 'powerjson-simple', 'superjson-default' ],
+    serializers: [ 'powerjson v1', 'superjson v1' ],
     metrics: allMetrics,
 }, {
-    serializers: [ 'powerjson-deduplicate', 'superjson-dedupe' ],
+    serializers: [ 'powerjson v2', 'superjson v2' ],
     metrics: allMetrics,
 }, {
-    serializers: allSerializers,
+    serializers: nonJsonSerializers,
     metrics: [ allMetrics[0] ],
 }, {
-    serializers: allSerializers,
+    serializers: nonJsonSerializers,
     metrics: [ allMetrics[1] ],
 }, {
-    serializers: allSerializers,
+    serializers: nonJsonSerializers,
     metrics: [ allMetrics[2] ],
 } ];
 

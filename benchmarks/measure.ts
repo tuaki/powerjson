@@ -1,7 +1,7 @@
 import { faker } from '@faker-js/faker';
 import Table from 'cli-table3';
 import { BENCHMARK_ITERATIONS_SCALE, BENCHMARK_SEED, DISPLAY_VERBOSE_RESULTS, RELATIVE_SPREAD_WARNING_THRESHOLD, WARMUP_ITERATIONS_RATIO } from './config.ts';
-import { renderStatColumn } from './format.ts';
+import { findBestStat, formatBestStat, renderRelativeCell } from './format.ts';
 import { addStats, createSeededRNG, forceGc, hashString, printBenchmarkError, printWarning, relativeSpread, selectUnit, shuffleInPlace, statFromSamples, type InputValue, type Scenario, type Serializer, type Stat, type Unit } from './utils.ts';
 
 export function runScenarios(scenarios: Scenario[], serializers: Serializer[]): ScenarioResult[] {
@@ -321,7 +321,10 @@ function printScenarioResults(result: ScenarioResult, serializers: Serializer[])
         },
     ];
 
-    const renderedColumns = columns.map(column => renderStatColumn(column.stats, column.unit));
+    const bestStats = columns.map(column => findBestStat(column.stats));
+    const renderedColumns = columns.map((column, index) => {
+        return column.stats.map(stat => renderRelativeCell(stat, column.unit, bestStats[index], undefined));
+    });
 
     const table = new Table({
         head: [ 'serializer', ...columns.map(column => column.label) ],
@@ -331,8 +334,10 @@ function printScenarioResults(result: ScenarioResult, serializers: Serializer[])
         },
     });
 
-    serializers.forEach((serializer, index) => {
-        table.push([ serializer.name, ...renderedColumns.map(column => column[index]!) ]);
+    table.push([ 'Best', ...bestStats.map((stat, index) => formatBestStat(stat, columns[index]!.unit)) ]);
+
+    serializers.forEach((serializer, rowIndex) => {
+        table.push([ serializer.name, ...renderedColumns.map(column => column[rowIndex]!) ]);
     });
 
     process.stdout.write(table.toString());

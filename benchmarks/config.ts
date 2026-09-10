@@ -3,6 +3,10 @@ export const DISPLAY_VERBOSE_RESULTS = true;
 
 export const BENCHMARK_SEED = 80085;
 export const REFERENCE_DATE = new Date('2025-01-01T12:00:00.000Z');
+
+/** If true, only the example scenario will be run. Otherwise, everything except the example will be run. */
+export const ONLY_EXAMPLE_SCENARIO = false;
+
 /**
  * Use this to scale the number of iterations for each benchmark.
  * Warning: values below 1 are not guarranteed to produce reliable results. (But neither are values above 1, haha.)

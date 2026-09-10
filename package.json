@@ -5,6 +5,14 @@
         "type": "git",
         "url": "git+https://github.com/tuaki/powerjson.git"
     },
+    "keywords": [
+        "json",
+        "serialization",
+        "deserialization",
+        "stringify",
+        "parse",
+        "performance"
+    ],
     "author": {
         "name": "Jáchym Bártík",
         "email": "jachymb32@gmail.com"
