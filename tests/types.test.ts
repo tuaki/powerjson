@@ -51,6 +51,44 @@ describe('primitive types', () => {
         });
         tester.serializeDeserialize(input, wrap(expected, 'bigint'));
     });
+
+    const symbolA = Symbol('symbolA');
+    const symbolB = Symbol('symbolB');
+
+    const symbolTester = Tester.createForAll(undefined, [
+        symbolA,
+        [ symbolB, 'bId' ],
+    ]);
+
+    test.each([
+        [ symbolA, 'symbolA' ],
+        [ symbolB, 'bId' ],
+    ])('symbol %p', (input, expected) => {
+        symbolTester.serializeDeserialize({ input }, {
+            $: { input: 'symbol' },
+            input: expected,
+        });
+        symbolTester.serializeDeserialize(input, wrap(expected, 'symbol'));
+    });
+
+    const symbolC = Symbol('symbolC');
+
+    test('unregistered symbol is ignored', () => {
+        symbolTester.serialize({ input: symbolC }, (serialized, serializer) => {
+            const expected = Tester.addVersionToSerialized(serializer, {});
+            expect(serialized).toStrictEqual(expected);
+        });
+    });
+
+    const symbolD = Symbol();
+
+    test('registering symbol without ID or description throws', () => {
+        expect(() => {
+            Tester.createForAll(undefined, [
+                symbolD,
+            ]);
+        }).toThrow('Trying to register a symbol without an explicit ID or description.');
+    });
 });
 
 describe('containers', () => {
@@ -89,6 +127,19 @@ describe('containers', () => {
         tester.serializeDeserialize({ input }, {
             $: annotations,
             input: expected,
+        });
+    });
+
+    test('sparse array', () => {
+        // eslint-disable-next-line no-sparse-arrays -- This is the very thing we want to test.
+        const input = [ 1, , 3 ];
+
+        tester.serialize({ input }, (serialized, serializer) => {
+            const expected = Tester.addVersionToSerialized(serializer, {
+                $: { input: { 2: 'undefined' } },
+                input: [ 1, null, 3 ],
+            });
+            expect(serialized).toStrictEqual(expected);
         });
     });
 
@@ -212,6 +263,36 @@ describe('special objects', () => {
         });
     });
 
+    test('symbol key is ignored', () => {
+        const symbol = Symbol('b');
+
+        const input: Record<string | symbol, unknown> = { a: 1, [symbol]: 2 };
+
+        tester.serialize({ input }, (serialized, serializer) => {
+            const expected = Tester.addVersionToSerialized(serializer, {
+                input: {
+                    a: 1,
+                },
+            });
+            expect(serialized).toStrictEqual(expected);
+        });
+    });
+
+    test('symbol key is ignored', () => {
+        const symbol = Symbol('b');
+
+        const input = [ 'a' ] as object as Record<string | symbol, unknown>;
+        input[symbol] = 2;
+        input['c'] = 3;
+
+        tester.serialize({ input }, (serialized, serializer) => {
+            const expected = Tester.addVersionToSerialized(serializer, {
+                input: [ 'a' ],
+            });
+            expect(serialized).toStrictEqual(expected);
+        });
+    });
+
     const forbiddenObjectKeys = [ '__proto__', 'prototype', 'constructor' ];
 
     test.each(forbiddenObjectKeys)('serialization rejects forbidden key %s', forbiddenKey => {
@@ -318,9 +399,8 @@ describe('predefined types', () => {
         tester.serializeDeserialize(input, wrap(expected, 'URL'));
     });
 
-    // TODO Add support for Symbol
-    // TODO Add support for Temporal
     // TODO Add support for Error
+    // TODO Add support for Temporal
     // test.each([
     //     [ new Error('error message'), 'error message' ],
     // ])('Error %p to %p', (input, expected) => {

@@ -1,7 +1,7 @@
 import { expect } from 'bun:test';
 import { PowerJson } from '../src/powerJson.ts';
 import type { Annotations, JsonObject, JsonValue, RootAnnotations } from '../src/json.js';
-import type { Transformer } from '../src/transformers.ts';
+import type { PowerJsonOptions } from '../src/config.ts';
 
 export function wrap(value: JsonValue, annotation?: Annotations[string]): JsonObject {
     return {
@@ -26,10 +26,10 @@ export class Tester {
         this.reverseJsonOrder = reverseJsonOrder;
     }
 
-    static createForAll(transformers: Transformer[] = []): Tester {
+    static createForAll(transformers: PowerJsonOptions['transformers'] = [], symbols: PowerJsonOptions['symbols'] = []): Tester {
         return new Tester([
-            new PowerJson({ deduplicate: false, transformers }),
-            new PowerJson({ deduplicate: true, transformers }),
+            new PowerJson({ deduplicate: false, transformers, symbols }),
+            new PowerJson({ deduplicate: true, transformers, symbols }),
         ]);
     }
 

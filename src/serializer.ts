@@ -1,4 +1,4 @@
-import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
 import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
@@ -97,6 +97,8 @@ export abstract class Serializer {
             const item = value[key];
 
             validateObjectKey(key);
+
+            // No need to check for symbol keys here since `Object.keys` doesn't return them.
 
             if (key[0] === ESCAPE_CHAR)
                 key = escapeKey(key);
@@ -204,11 +206,15 @@ export abstract class Serializer {
                 // NICE_TO_HAVE There is a new approach in ES2026 which already works mostly everywhere, but we should probably just convert it to a string for now.
                 this.addAnnotation(BIGINT_ANNOTATION);
                 return String(value);
+            case 'symbol': {
+                const serialized = this.config.getSymbolId(value);
+                if (serialized !== undefined)
+                    this.addAnnotation(SYMBOL_ANNOTATION);
+
+                return serialized;
+            }
             case 'object':
                 return value === null ? null : this.serializeObjectLike(value);
-            case 'symbol':
-                // TODO Add support for Symbol
-                return undefined;
             case 'function':
                 // This ain't gonna happen.
                 return undefined;
@@ -216,7 +222,7 @@ export abstract class Serializer {
     }
 
     private serializeObjectLike(value: ObjectLike): JsonValue | undefined {
-        const transformer = this.config.getTransformerForObject(value);
+        const transformer = this.config.getObjectTransformer(value);
 
         if (transformer.isComposite && this.compositeIndex === undefined)
             this.compositeIndex = 0;

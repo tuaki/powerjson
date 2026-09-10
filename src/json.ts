@@ -65,3 +65,4 @@ export const REFERENCE_ANNOTATION: TypeId = 'ref';
 export const UNDEFINED_ANNOTATION: TypeId = 'undefined';
 export const NUMBER_ANNOTATION: TypeId = 'number';
 export const BIGINT_ANNOTATION: TypeId = 'bigint';
+export const SYMBOL_ANNOTATION: TypeId = 'symbol';

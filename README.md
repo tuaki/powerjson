@@ -86,7 +86,7 @@ These types are supported by PowerJson (so far). More types will be added as the
 | `Object`                                                                                   | ✅                          | ✅                      |
 | `undefined`                                                                                | ❌                          | ✅                      |
 | `bigint`                                                                                   | ❌                          | ✅                      |
-| `symbol`                                                                                   | ❌                          | ❌ (2.) TODO            |
+| `symbol`                                                                                   | ❌                          | ✅ (2.) TODO            |
 | `Set`                                                                                      | ❌                          | ✅                      |
 | `Map`                                                                                      | ❌                          | ✅                      |
 | `Date`                                                                                     | ❌                          | ✅                      |
@@ -96,8 +96,8 @@ These types are supported by PowerJson (so far). More types will be added as the
 | `Error`                                                                                    | ❌                          | ❌ TODO                 |
 | [Typed arrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Typed_arrays) | ❌                          | ✅                      |
 
-1. Some values (`NaN`, `Infinity`, `-Infinity`, and `-0`) are missing.
-2. Needs to be registered (see below). Also, only values are supported, not object keys.
+1. Some values (`NaN`, `Infinity`, `-Infinity`, and `-0`) are not supported in standard JSON.
+2. Needs to be registered first (see below).
 
 ### Custom classes
 
@@ -123,7 +123,24 @@ See [custom tests](./tests/custom.test.ts) for more examples.
 
 ### Symbols
 
-TODO
+Symbols in object keys will be ignored. Symbols in values will be replaced with their IDs if they are registered. Otherwise, they will be ignored. To register symbols, pass an array of symbols or symbol-ID pairs to the configuration:
+
+```ts
+import { PowerJson } from 'powerjson';
+
+const symbolA = Symbol('symbolA');
+const symbolB = Symbol('symbolB');
+const empty = Symbol();
+
+export const powerJson = new PowerJson({
+    symbols: [
+        symbolA,            // The symbol's description will be used as the ID.
+        [ symbolB, 'bId' ], // `bId` will be used as the ID.
+        // empty,           // Don't do this, it will throw an error.
+        [ empty, 'empty' ], // This is fine, the 'empty' will be used as the ID.
+    ],
+});
+```
 
 ## Non-goals
 

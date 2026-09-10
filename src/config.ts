@@ -7,6 +7,11 @@ export type PowerJsonOptions = {
     deduplicate?: boolean;
     sortObjectKeys?: SortObjectKeysOption;
     transformers?: Transformer[];
+    /**
+     * For each symbol, provide either symbol-ID pair, or just the symbol.
+     * In the latter case, the symbol's description will be used as the ID. If the description is undefined, an error will be thrown.
+     */
+    symbols?: (symbol | [symbol, string])[];
 };
 
 export class PowerJsonConfig {
@@ -19,6 +24,7 @@ export class PowerJsonConfig {
         deduplicate = false,
         sortObjectKeys = 'catch',
         transformers = [],
+        symbols = [],
     }: PowerJsonOptions = {}) {
         this.space = space;
         this.deduplicate = deduplicate;
@@ -29,6 +35,8 @@ export class PowerJsonConfig {
             ...typedArrayTransformers,
             ...transformers,
         ].forEach(transformer => this.registerTransformer(transformer));
+
+        symbols.forEach(symbol => this.registerSymbol(symbol));
     }
 
     get version(): AlgorithmVersion {
@@ -60,7 +68,7 @@ export class PowerJsonConfig {
     // [1] https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/instanceof
     // [2] https://bun.com/reference/node/util/types
 
-    getTransformerForObject(value: ObjectLike): Transformer {
+    getObjectTransformer(value: ObjectLike): Transformer {
         let prototype = Object.getPrototypeOf(value);
 
         while (prototype !== null) {
@@ -77,11 +85,43 @@ export class PowerJsonConfig {
         return this.transformersByPrototype.get(defaultPrototype)!;
     }
 
-    getTransformerForType(typeId: TypeId): Transformer {
+    getTransformerByType(typeId: TypeId): Transformer {
         const transformer = this.transformersByType.get(typeId);
         if (!transformer)
             throw new Error(`No transformer found for type: ${typeId}.`);
 
         return transformer;
+    }
+
+    private readonly symbolIdsBySymbol: Map<symbol, string> = new Map();
+    private readonly symbolsById: Map<string, symbol> = new Map();
+
+    // We could use the global symbol registry (Symbol.for and Symbol.keyFor) but it's not guaranteed the users actually want to register their symbols there.
+    // Also, we want a better control (e.g., explicit errors).
+
+    private registerSymbol(symbolOrPair: symbol | [symbol, string]): void {
+        const [ symbol, id ] = Array.isArray(symbolOrPair)
+            ? symbolOrPair
+            : [ symbolOrPair, symbolOrPair.description ];
+
+        if (id === undefined) {
+            // No need to print the symbol - it will be "Symbol()" anyway.
+            throw new Error('Trying to register a symbol without an explicit ID or description.');
+        }
+
+        this.symbolIdsBySymbol.set(symbol, id);
+        this.symbolsById.set(id, symbol);
+    }
+
+    getSymbolId(symbol: symbol): string | undefined {
+        return this.symbolIdsBySymbol.get(symbol);
+    }
+
+    getSymbolById(id: string): symbol {
+        const symbol = this.symbolsById.get(id);
+        if (symbol === undefined)
+            throw new Error(`No symbol found for id: ${id}.`);
+
+        return symbol;
     }
 }
