@@ -9,13 +9,13 @@ export abstract class Serializer {
         this.config = config;
     }
 
-    serialize(value: unknown): RootJsonObject {
+    serialize(input: unknown): RootJsonObject {
         // If the top-level value isn't a plain object, we have to wrap it so that it can put its annotations somewhere.
-        const isWrapped = !isPlainObject(value);
+        const isWrapped = !isPlainObject(input);
 
-        const input = isWrapped ? { [WRAPPED_KEY]: value } : value;
-        this.trySetReference(input);
-        const serialized = this.serializePlainObject(input);
+        const inputObject = isWrapped ? { [WRAPPED_KEY]: input } : input;
+        this.trySetReference(inputObject);
+        const serialized = this.serializePlainObject(inputObject);
 
         let annotations = serialized[ESCAPE_CHAR];
         if (annotations === undefined) {

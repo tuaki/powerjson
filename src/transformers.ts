@@ -2,7 +2,7 @@ import type { JsonValue, TypeId } from './json.ts';
 import type { Serializer } from './serializer.ts';
 import type { Deserializer } from './deserializer.ts';
 
-// Numbers are serialized according to the Section 7.1.12.1 of the [ECMA 262](https://www.ecma-international.org/ecma-262/10.0/index.html) standard with the exception of `-0` (which is converted to "-0"` instead of `"0"`).
+// Numbers are serialized according to the [Number::toString (ES2026)](https://262.ecma-international.org/17.0/#sec-numeric-types-number-tostring) algorithm with the exception of `-0` (which is converted to "-0"` instead of `"0"`).
 // Additionally, JSON doesn't support strings for numbers, so the four special string values are expressed in their string form (with extra `"`) instead of raw numbers.
 
 const PLUS_INFINITY = 'Infinity';
@@ -173,6 +173,8 @@ const dateTransformer = transformer({
     },
 });
 
+// TODO Add support for Temporal
+
 const regexpTransformer = transformer({
     clazz: RegExp,
     type: 'RegExp',
@@ -198,18 +200,107 @@ const urlTransformer = transformer({
     },
 });
 
-// TODO Add support for Temporal
-// TODO Add support for Error
+// The ES2026 standard defines these specialization of errors:
+// - [NativeError](https://262.ecma-international.org/17.0/#sec-nativeerror-object-structure) (several subtypes, see below)
+//
+// We support all of them according to the [html serialization algorithm](https://html.spec.whatwg.org/multipage/structured-data.html#structuredserializeinternal).
+// - The `stack` property is not included unless explicitly allowed.
+// - The `cause` property (not part of the html algorithm) is included by default.
+//
+// NICE_TO_HAVE
+// [AggregateError](https://262.ecma-international.org/17.0/#sec-aggregate-error-objects) is not supported yet because it's not in the html algorithm. However, there is a [PR](https://github.com/whatwg/html/pull/5749) so let's hope it will be merged soon.
+// [SupressedError](https://tc39.es/ecma262/#sec-suppressederror-objects) is not yet in the current standard (ES2026).
 
-export const baseTransformers = {
-    plainObject: plainObjectTransformer,
-    array: arrayTransformer,
-    set: setTransformer,
-    map: mapTransformer,
-    date: dateTransformer,
-    regexp: regexpTransformer,
-    url: urlTransformer,
-};
+const errorTransformer = transformer({
+    clazz: Error,
+    type: 'Error',
+    serialize: (value, serializer) => {
+        // The default `Error` properties aren't enumerable. So, we need to explicitly copy them to a plain object.
+        // There might be other non-standard properties (e.g., `lineNumber` in Firefox) but we probably don't want to expose them.
+
+        // This seems complicated, but the algorithm does it this way.
+        let message: string | undefined;
+        const descriptor = Object.getOwnPropertyDescriptor(value, 'message');
+        if (descriptor !== undefined && 'value' in descriptor)
+            message = String(descriptor.value);
+
+        const valueName = value.name;
+        const name = nativeErrorConstructorsByName.has(valueName) ? valueName : 'Error';
+
+        const plainObject: Record<string, unknown> = {
+            name,
+            message,
+        };
+
+        if (serializer.config.allowStackInError)
+            plainObject.stack = value.stack;
+
+        // Copy `cause` only if it exists (the classical difference between `undefined` and "not defined" strikes again).
+        if ('cause' in value)
+            plainObject.cause = value.cause;
+
+        const keys = Object.keys(value);
+        const keysLength = keys.length;
+        for (let i = 0; i < keysLength; i++) {
+            const key = keys[i];
+            if (key === 'name' || key === 'message' || key === 'stack' || key === 'cause')
+                continue;
+
+            plainObject[key] = value[key as keyof typeof value];
+        }
+
+        return serializer.serializePlainObject(plainObject);
+    },
+    deserialize: (value, deserializer) => {
+        const { name, message, ...rest } = value;
+        const constructor = nativeErrorConstructorsByName.get(name as string) ?? Error;
+
+        // If the message was undefined, it was serialized as `null`, so we convert it back to undefined. Otherwise, it must be a string.
+        const error = new constructor(message as string | null ?? undefined);
+
+        deserializer.deserializePlainObject(rest, error as object as Record<string, unknown>);
+
+        // `cause` is a non-enumerable property. Normally, we would pass it through the constructor, but we can't do that because we have to deserialize it first, and for that, the error has to be already instantiated and registered as a reference target.
+        // Also, `undefined` vs "not defined" strikes again.
+        if ('cause' in error) {
+            Object.defineProperty(error, 'cause', {
+                writable: true,
+                enumerable: false,
+                configurable: true,
+            });
+        }
+
+        // If stack is missing, we still want to override the default stack trace (which would point to the `new constructor()` call above).
+        if (!('stack' in value))
+            error.stack = undefined;
+
+        return error;
+    },
+    isEntity: true,
+});
+
+// See https://262.ecma-international.org/17.0/#sec-native-error-types-used-in-this-standard.
+const nativeErrorConstructors = [
+    Error,
+    EvalError,
+    RangeError,
+    ReferenceError,
+    SyntaxError,
+    TypeError,
+    URIError,
+];
+const nativeErrorConstructorsByName = new Map(nativeErrorConstructors.map(constructor => [ constructor.name, constructor ]));
+
+export const baseTransformers = [
+    plainObjectTransformer,
+    arrayTransformer,
+    setTransformer,
+    mapTransformer,
+    dateTransformer,
+    regexpTransformer,
+    urlTransformer,
+    errorTransformer,
+];
 
 const typedArrayConstructors = [
     Int8Array,

@@ -1,7 +1,6 @@
 import { expect, test, describe } from 'bun:test';
-import { Tester } from './utils.js';
+import { Tester, wrap } from './utils.ts';
 import { DateTime } from 'luxon';
-import { wrap } from './utils.js';
 import { transformer } from '../src/transformers.ts';
 
 class PrivateClass {
@@ -39,8 +38,6 @@ const dateTimeTransformer = transformer({
     type: 'DateTime',
     serialize: value => value.toISO()!,
     deserialize: value => DateTime.fromISO(value, { setZone: true }),
-    isEntity: false,
-    isComposite: false,
 });
 
 test('Luxon DateTime to ISO string', () => {
@@ -73,8 +70,6 @@ const simpleDateTimeTransformer = transformer({
     type: 'SDT',
     serialize: value => value.iso,
     deserialize: value => SimpleDateTime.create(value),
-    isEntity: false,
-    isComposite: false,
 });
 
 test('class to primitive', () => {
@@ -111,7 +106,6 @@ const pointTransformer = transformer({
         const [ x, y, z ] = deserializer.deserializeArray(value) as [ number, number, number | undefined ];
         return new Point(x, y, z);
     },
-    isEntity: false,
     isComposite: true,
 });
 
@@ -150,8 +144,6 @@ const authorTransformer = transformer({
     // So, don't do this!
     // The internal API might be exposed in the future if a really good use case is found, but for now, it remains closed.
     deserialize: value => new Author((value as { name: string }).name),
-    isEntity: false,
-    isComposite: false,
 });
 
 class Comment {
@@ -187,8 +179,6 @@ const commentTransformer = transformer({
 
         return new Comment(object.author, object.content, object.createdAt, object.responses);
     },
-    isEntity: false,
-    isComposite: false,
 });
 
 test('recursively nested classes', () => {
@@ -265,6 +255,119 @@ test('recursively nested classes', () => {
     });
 });
 
+class User {
+    constructor(
+        readonly id: number,
+        readonly name: string,
+        readonly friends: User[],
+        readonly createdAt: Date,
+    ) {}
+}
+
+const userTransformer = transformer({
+    clazz: User,
+    type: 'User',
+    serialize: (value, serializer) => serializer.serializePlainObject(value as unknown as Record<string, unknown>),
+    deserialize: (value, deserializer) => {
+        // This is probably the most efficient way how to deserialize custom types while still running their constructors and supporting circular references.
+        // The instance will be registered correctly, because it's passed as the `output` parameter to `deserializePlainObject`.
+
+        // @ts-expect-error - We will fill the object later.
+        const user = new User();
+        // `Object.create(User.prototype)` would work without silencing TS, but it would not call the constructor which is a major red flag.
+
+        return deserializer.deserializePlainObject(value, user as unknown as Record<string, unknown>) as object as User;
+    },
+    // Users can befriend one another (even themselves), so they must be tracked as entities to support circular references.
+    isEntity: true,
+});
+
+describe('circular references between custom types', () => {
+    const tester = Tester.createForAll([ userTransformer ]);
+
+    test('a user who is friends with himself', () => {
+        const alice = new User(1, 'Alice', [], new Date('2020-01-01T00:00:00.000Z'));
+        alice.friends.push(alice);
+
+        tester.serializeDeserialize({ input: alice }, {
+            $: { input: 'User' },
+            input: {
+                $: { friends: { 1: 'ref' }, createdAt: 'Date' },
+                id: 1,
+                name: 'Alice',
+                friends: [ 1 ],
+                createdAt: '2020-01-01T00:00:00.000Z',
+            },
+        }, {
+            $: { input: [ 'User', 1 ] },
+            input: {
+                $: { friends: { 1: 'ref' }, createdAt: 'Date' },
+                id: 1,
+                name: 'Alice',
+                friends: [ 1 ],
+                createdAt: '2020-01-01T00:00:00.000Z',
+            },
+        });
+    });
+
+    test('mutual friends form a cycle through custom types', () => {
+        const alice = new User(1, 'Alice', [], new Date('2020-01-01T00:00:00.000Z'));
+        const bob = new User(2, 'Bob', [ alice ], new Date('2020-02-02T00:00:00.000Z'));
+        alice.friends.push(bob);
+
+        const carol = new User(3, 'Carol', [], new Date('2020-03-03T00:00:00.000Z'));
+        alice.friends.push(carol);
+
+        tester.serializeDeserialize({ input: alice }, {
+            $: { input: 'User' },
+            input: {
+                $: { friends: { 1: 'User', 2: 'User' }, createdAt: 'Date' },
+                id: 1,
+                name: 'Alice',
+                friends: [ {
+                    $: { friends: { 1: 'ref' }, createdAt: 'Date' },
+                    id: 2,
+                    name: 'Bob',
+                    friends: [ 1 ],
+                    createdAt: '2020-02-02T00:00:00.000Z',
+                }, {
+                    $: {
+                        createdAt: 'Date',
+                    },
+                    createdAt: '2020-03-03T00:00:00.000Z',
+                    friends: [],
+                    id: 3,
+                    name: 'Carol',
+                } ],
+                createdAt: '2020-01-01T00:00:00.000Z',
+            },
+        }, {
+            $: { input: [ 'User', 1 ] },
+            input: {
+                $: { friends: { 1: 'User', 2: 'User' }, createdAt: 'Date' },
+                id: 1,
+                name: 'Alice',
+                friends: [ {
+                    $: { friends: { 1: 'ref' }, createdAt: 'Date' },
+                    id: 2,
+                    name: 'Bob',
+                    friends: [ 1 ],
+                    createdAt: '2020-02-02T00:00:00.000Z',
+                }, {
+                    $: {
+                        createdAt: 'Date',
+                    },
+                    createdAt: '2020-03-03T00:00:00.000Z',
+                    friends: [],
+                    id: 3,
+                    name: 'Carol',
+                } ],
+                createdAt: '2020-01-01T00:00:00.000Z',
+            },
+        });
+    });
+});
+
 abstract class A {
     protected constructor(
         readonly id: number,
@@ -276,8 +379,6 @@ const aTransformer = transformer({
     type: 'A',
     serialize: value => ({ id: value.id }),
     deserialize: value => value as unknown as A,
-    isEntity: false,
-    isComposite: false,
 });
 
 class B extends A {
@@ -311,8 +412,6 @@ const cTransformer = transformer({
         const object = value as { id: number, label: string, isActive: boolean };
         return new C(object.id, object.label, object.isActive);
     },
-    isEntity: false,
-    isComposite: false,
 });
 
 class D extends C {

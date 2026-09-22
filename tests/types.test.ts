@@ -1,6 +1,6 @@
 import { expect, test, describe } from 'bun:test';
-import type { Annotations, JsonArray, JsonMap } from '../src/json.js';
-import { Tester, wrap } from './utils.js';
+import type { Annotations, JsonArray, JsonMap } from '../src/json.ts';
+import { Tester, wrap } from './utils.ts';
 
 const tester = Tester.createForAll();
 
@@ -297,6 +297,8 @@ describe('special objects', () => {
 
     test.each(forbiddenObjectKeys)('serialization rejects forbidden key %s', forbiddenKey => {
         tester.forEach(serializer => {
+            // Using just `{}` would not create an own property for `__proto__` (it would hit the inherited accessor instead), so `Object.create(null)` is needed to force a genuine own property.
+            // Another option would be to use `Object.defineProperty`.
             const input: Record<string, unknown> = Object.create(null);
             input[forbiddenKey] = 1;
 
@@ -377,6 +379,8 @@ describe('predefined types', () => {
         });
     });
 
+    // TODO Add support for Temporal
+
     test.each([
         [ /abc/g, '/abc/g' ],
         [ /a.*([^{]){0,4}/, '/a.*([^{]){0,4}/' ],
@@ -398,15 +402,4 @@ describe('predefined types', () => {
         });
         tester.serializeDeserialize(input, wrap(expected, 'URL'));
     });
-
-    // TODO Add support for Error
-    // TODO Add support for Temporal
-    // test.each([
-    //     [ new Error('error message'), 'error message' ],
-    // ])('Error %p to %p', (input, expected) => {
-    //     tester.serializeDeserialize({ input }, {
-    //         $: { input: 'Error' },
-    //         input: expected,
-    //     });
-    // });
 });

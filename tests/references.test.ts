@@ -1,5 +1,5 @@
 import { expect, test, describe } from 'bun:test';
-import { reverseObjectKeys, Tester, wrap } from './utils.js';
+import { reverseObjectKeys, Tester, wrap } from './utils.ts';
 import { PowerJson } from '../src/powerJson.ts';
 import SuperJson from 'superjson';
 

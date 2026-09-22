@@ -1,33 +1,17 @@
+import type { SortObjectKeysOption } from './config.ts';
 import { Deserializer } from './deserializer.ts';
 import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey, type RootJsonObject } from './json.ts';
 import { validateObjectKey, type ObjectLike } from './transformers.ts';
 
-export type SortObjectKeysOption =
-    /**
-     * The objects will be sorted before deserialization.
-     * This is the best option if you know there is a high probability of key order being changed.
-     */
-    | 'always'
-    /**
-     * The objects won't be sorted, but if a reference is not found, we sort them and try again.
-     * Choose this if you think the key order is usually preserved, but you wouldn't bet your life on it.
-     */
-    | 'catch'
-    /**
-     * The objects won't be sorted.
-     * Useful if you want to proactively detect any possible slowdown or if you enjoy living on the edge.
-     */
-    | 'never';
-
 export class DeduplicatedDeserializer extends Deserializer {
     private sortObjectKeys!: SortObjectKeysOption;
 
-    override deserialize(value: RootJsonObject) {
+    override deserialize(root: RootJsonObject) {
         this.sortObjectKeys = this.config.sortObjectKeys;
 
         if (this.sortObjectKeys === 'catch') {
             try {
-                return super.deserialize(value);
+                return super.deserialize(root);
             }
             catch (error) {
                 if (error !== expectedReferenceError)
@@ -39,9 +23,9 @@ export class DeduplicatedDeserializer extends Deserializer {
         }
 
         if (this.sortObjectKeys === 'always')
-            value = checkOrSortObjectKeys(value) as RootJsonObject;
+            root = checkOrSortObjectKeys(root) as RootJsonObject;
 
-        return super.deserialize(value);
+        return super.deserialize(root);
     }
 
     // #region Annotations

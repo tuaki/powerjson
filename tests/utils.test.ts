@@ -1,5 +1,5 @@
 import { expect, test, describe } from 'bun:test';
-import { testIdentityEqualities } from './utils.js';
+import { testIdentityEqualities } from './utils.ts';
 
 describe('utils', () => {
     test('finds references behind excluded wrappers', () => {

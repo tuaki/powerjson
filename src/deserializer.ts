@@ -2,8 +2,8 @@ import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION
 import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
-export function getAlgorithmVersion(value: RootJsonObject): AlgorithmVersion {
-    return value[ESCAPE_CHAR][ESCAPE_CHAR];
+export function getAlgorithmVersion(root: RootJsonObject): AlgorithmVersion {
+    return root[ESCAPE_CHAR][ESCAPE_CHAR];
 }
 
 export abstract class Deserializer {
@@ -13,13 +13,13 @@ export abstract class Deserializer {
         this.config = config;
     }
 
-    deserialize(value: RootJsonObject): unknown {
-        const annotations = value[ESCAPE_CHAR];
-        const isWrapped = annotations[WRAPPED_DIRECTIVE] === true && value[WRAPPED_DIRECTIVE] === undefined;
+    deserialize(root: RootJsonObject): unknown {
+        const annotations = root[ESCAPE_CHAR];
+        const isWrapped = annotations[WRAPPED_DIRECTIVE] === true && root[WRAPPED_DIRECTIVE] === undefined;
 
-        const deserialized = this.deserializePlainObject(value);
+        const output = this.deserializePlainObject(root);
 
-        return isWrapped ? deserialized[WRAPPED_KEY] : deserialized;
+        return isWrapped ? output[WRAPPED_KEY] : output;
     }
 
     // #region Context
@@ -58,8 +58,11 @@ export abstract class Deserializer {
     // #endregion
     // #region Objects
 
-    deserializePlainObject(value: JsonObject): Record<string, unknown> {
-        const output: Record<string, unknown> = {};
+    /**
+     * @param output The object to deserialize the fields into. Defaults to a fresh plain object.
+     * Custom transformers whose result isn't a plain object can pass their own instance here, so that it (rather than a throwaway placeholder) is registered as this entity's reference target - which matters for self-referencing or circular structures.
+     */
+    deserializePlainObject(value: JsonObject, output: Record<string, unknown> = {}): Record<string, unknown> {
         this.trySetReference(output);
 
         const annotations = value[ESCAPE_CHAR] as Annotations | undefined;

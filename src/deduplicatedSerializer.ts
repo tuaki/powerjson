@@ -3,8 +3,8 @@ import { deleteEscapeKeyIfEmpty, Serializer } from './serializer.ts';
 import type { ObjectLike } from './transformers.ts';
 
 export class DeduplicatedSerializer extends Serializer {
-    override serialize(value: unknown): RootJsonObject {
-        const serialized = super.serialize(value);
+    override serialize(input: unknown): RootJsonObject {
+        const serialized = super.serialize(input);
 
         addIdentityAnnotations(this.seenEntities);
 

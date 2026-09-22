@@ -36,6 +36,7 @@ export default defineConfig([
                 terms: [ 'TODO', 'FIXME', 'NICE_TO_HAVE' ],
             } ],
             'curly': [ 'warn', 'multi-or-nest', 'consistent' ],
+            'no-duplicate-imports': [ 'error' ],
 
             // Replaced by the @typescript-eslint rules.
             'no-unused-vars': 'off',

@@ -14,20 +14,20 @@ export class PowerJson {
         this.config = new PowerJsonConfig(options);
     }
 
-    serialize(value: unknown): JsonObject {
-        return serialize(value, this.config);
+    serialize(input: unknown): JsonObject {
+        return serialize(input, this.config);
     }
 
     deserialize<T = unknown>(jsonValue: JsonObject): T {
         return deserialize<T>(jsonValue, this.config);
     }
 
-    stringify(value: unknown): string {
-        return JSON.stringify(this.serialize(value), undefined, this.config.space);
+    stringify(input: unknown): string {
+        return JSON.stringify(this.serialize(input), undefined, this.config.space);
     }
 
-    parse<T = unknown>(string: string): T {
-        return this.deserialize(JSON.parse(string)) as T;
+    parse<T = unknown>(jsonString: string): T {
+        return this.deserialize(JSON.parse(jsonString)) as T;
     }
 
     private static defaultInstance = new PowerJson();

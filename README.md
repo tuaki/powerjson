@@ -86,14 +86,14 @@ These types are supported by PowerJson (so far). More types will be added as the
 | `Object`                                                                                   | ✅                          | ✅                      |
 | `undefined`                                                                                | ❌                          | ✅                      |
 | `bigint`                                                                                   | ❌                          | ✅                      |
-| `symbol`                                                                                   | ❌                          | ✅ (2.) TODO            |
+| `symbol`                                                                                   | ❌                          | ✅ (2.)                 |
 | `Set`                                                                                      | ❌                          | ✅                      |
 | `Map`                                                                                      | ❌                          | ✅                      |
 | `Date`                                                                                     | ❌                          | ✅                      |
 | `Temporal`                                                                                 | ❌                          | ❌ TODO                 |
 | `RegExp`                                                                                   | ❌                          | ✅                      |
 | `URL`                                                                                      | ❌                          | ✅                      |
-| `Error`                                                                                    | ❌                          | ❌ TODO                 |
+| `Error`                                                                                    | ❌                          | ✅                      |
 | [Typed arrays](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Typed_arrays) | ❌                          | ✅                      |
 
 1. Some values (`NaN`, `Infinity`, `-Infinity`, and `-0`) are not supported in standard JSON.

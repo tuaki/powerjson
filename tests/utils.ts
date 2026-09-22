@@ -1,6 +1,6 @@
 import { expect } from 'bun:test';
 import { PowerJson } from '../src/powerJson.ts';
-import type { Annotations, JsonObject, JsonValue, RootAnnotations } from '../src/json.js';
+import type { Annotations, JsonObject, JsonValue, RootAnnotations } from '../src/json.ts';
 import type { PowerJsonOptions } from '../src/config.ts';
 
 export function wrap(value: JsonValue, annotation?: Annotations[string]): JsonObject {
@@ -16,14 +16,18 @@ export function wrap(value: JsonValue, annotation?: Annotations[string]): JsonOb
 export class Tester {
     private serializers: PowerJson[];
     private reverseJsonOrder: boolean;
+    private checker: Checker;
 
     constructor(serializers: PowerJson | PowerJson[], {
         reverseJsonOrder = false,
+        preserveErrorStack = false,
     }: {
         reverseJsonOrder?: boolean;
+        preserveErrorStack?: boolean;
     } = {}) {
         this.serializers = Array.isArray(serializers) ? serializers : [ serializers ];
         this.reverseJsonOrder = reverseJsonOrder;
+        this.checker = new Checker(preserveErrorStack);
     }
 
     static createForAll(transformers: PowerJsonOptions['transformers'] = [], symbols: PowerJsonOptions['symbols'] = []): Tester {
@@ -54,46 +58,53 @@ export class Tester {
         }
     }
 
-    serializeDeserialize(input: unknown, ...expectedSerialized: (JsonObject | undefined)[]) {
+    serializeDeserialize<TInput = unknown>(input: TInput, ...expectedSerialized: (JsonObject | undefined)[]): TInput[] {
+        const outputs: TInput[] = [];
+
         let i = 0;
         for (const serializer of this.serializers) {
             let expected = expectedSerialized[i];
             if (expected)
                 expected = Tester.addVersionToSerialized(serializer, expected);
 
-            testSerializeDeserialize(serializer, input, expected, this.reverseJsonOrder);
+            const output = this.testSerializeDeserialize(serializer, input, expected, this.reverseJsonOrder);
+            outputs.push(output);
             i = (i + 1) % expectedSerialized.length;
         }
+
+        return outputs;
+    }
+
+    private testSerializeDeserialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: JsonObject | undefined, reverseJsonOrder: boolean): TInput {
+    // Make sure the input is not mutated during serialization.
+        deepFreeze(input);
+
+        let serialized = serializer.serialize(input);
+        if (expectedSerialized !== undefined)
+            expect(serialized).toStrictEqual(expectedSerialized);
+
+        if (reverseJsonOrder)
+            serialized = reverseObjectKeys(serialized);
+
+        const parsed = JSON.parse(JSON.stringify(serialized));
+
+        // Again, no changes during deserialization.
+        deepFreeze(parsed);
+
+        const output = serializer.deserialize(parsed);
+        this.checker.checkOutput(input, output);
+
+        if (serializer.config.deduplicate)
+            testIdentityEqualities(input, output);
+        // NICE_TO_HAVE else check the identities but only for circular references ?.
+
+        return output as TInput;
     }
 
     forEach(callback: (serializer: PowerJson) => void) {
         for (const serializer of this.serializers)
             callback(serializer);
     }
-}
-
-export function testSerializeDeserialize(serializer: PowerJson, input: unknown, expectedSerialized?: JsonObject, reverseJsonOrder = false) {
-    // Make sure the input is not mutated during serialization.
-    deepFreeze(input);
-
-    let serialized = serializer.serialize(input);
-    if (expectedSerialized !== undefined)
-        expect(serialized).toStrictEqual(expectedSerialized);
-
-    if (reverseJsonOrder)
-        serialized = reverseObjectKeys(serialized);
-
-    const parsed = JSON.parse(JSON.stringify(serialized));
-
-    // Again, no changes during deserialization.
-    deepFreeze(parsed);
-
-    const deserialized = serializer.deserialize(parsed);
-    expect(deserialized).toStrictEqual(input);
-
-    if (serializer.config.deduplicate)
-        testIdentityEqualities(input, deserialized);
-    // NICE_TO_HAVE else check the identities but only for circular references ?.
 }
 
 function deepFreeze(object: unknown, visitedObjects = new Set()) {
@@ -282,4 +293,76 @@ function stringifyPath(path: string[]): string {
 
 function escapeKey(key: string) {
     return key.replace(/\\/g, '\\\\').replace(/\./g, '\\.');
+}
+
+export class Checker {
+    constructor(
+        private readonly preserveErrorStack: boolean = false,
+    ) {}
+
+    /** Handles circular/shared structures (e.g. `error.cause === error`): once a pair has been compared, later encounters only assert referential identity instead of recursing again. */
+    private readonly visitedErrors = new Map<Error, Error>();
+
+    /** Like `expect(output).toStrictEqual(input)` but handles errors as well. */
+    checkOutput(input: unknown, output: unknown) {
+        this.visitedErrors.clear();
+        this.checkOutputInner(input, output);
+    }
+
+    static checkOutput(input: unknown, output: unknown, preserveErrorStack: boolean = false) {
+        return new Checker(preserveErrorStack).checkOutput(input, output);
+    }
+
+    checkOutputInner(input: unknown, output: unknown) {
+        if (input instanceof Error) {
+            expect(output).toBeInstanceOf(Error);
+            this.checkErrors(input, output as Error);
+        }
+        else {
+            expect(output).toStrictEqual(input);
+        }
+    }
+
+    /**
+     * Compares two errors recursively, including their causes and custom properties.
+     * Errors can't be compared with `toStrictEqual` because the stacks (and probably some other internal properties) are different.
+     * Also, stack is not enumerable, so it won't show up in the test diff.
+     */
+    checkErrors(input: Error, output: Error) {
+        const visited = this.visitedErrors;
+        const alreadyVisited = visited.get(input);
+        if (alreadyVisited !== undefined) {
+            expect(output).toBe(alreadyVisited);
+            return;
+        }
+
+        visited.set(input, output);
+
+        expect(input).toBeInstanceOf(Error);
+        expect(output).toBeInstanceOf(Error);
+
+        expect(input.name).toBe(output.name);
+        expect(input.message).toBe(output.message);
+        expect(input).toHaveProperty('stack');
+        expect(output).toHaveProperty('stack');
+
+        if (this.preserveErrorStack)
+            expect(output.stack).toBe(input.stack);
+        else
+            expect(output.stack).toBeUndefined();
+
+        expect('cause' in input).toBe('cause' in output);
+        if ('cause' in input)
+            this.checkOutputInner(input.cause, output.cause);
+
+        const customKeys = Object.keys(input);
+        expect(Object.keys(output)).toStrictEqual(customKeys);
+
+        for (const key of customKeys) {
+            const valueA = input[key as keyof Error];
+            const valueB = output[key as keyof Error];
+
+            this.checkOutputInner(valueA, valueB);
+        }
+    }
 }

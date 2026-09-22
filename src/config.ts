@@ -1,11 +1,26 @@
-import type { SortObjectKeysOption } from './deduplicatedDeserializer.ts';
 import type { AlgorithmVersion, TypeId } from './json.ts';
 import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transformer } from './transformers.ts';
 
 export type PowerJsonOptions = {
+    /**
+     * Will be passed to `JSON.stringify` as the third argument.
+     * @default undefined
+     */
     space?: string | number;
+    /**
+     * @default false
+     */
     deduplicate?: boolean;
+    /**
+     * Controls sorting of object keys during deserialization when deduplication is enabled.
+     * @default 'catch'
+     */
     sortObjectKeys?: SortObjectKeysOption;
+    /**
+     * If true, the default transformer for `Error` will include the `stack` property.
+     * @default false
+     */
+    allowStackInError?: boolean;
     transformers?: Transformer[];
     /**
      * For each symbol, provide either symbol-ID pair, or just the symbol.
@@ -14,24 +29,44 @@ export type PowerJsonOptions = {
     symbols?: (symbol | [symbol, string])[];
 };
 
+export type SortObjectKeysOption =
+    /**
+     * The objects will be sorted before deserialization.
+     * This is the best option if you know there is a high probability of key order being changed.
+     */
+    | 'always'
+    /**
+     * The objects won't be sorted, but if a reference is not found, we sort them and try again.
+     * Choose this if you think the key order is usually preserved, but you wouldn't bet your life on it.
+     */
+    | 'catch'
+    /**
+     * The objects won't be sorted.
+     * Useful if you want to proactively detect any possible slowdown or if you enjoy living on the edge.
+     */
+    | 'never';
+
 export class PowerJsonConfig {
     readonly space: string | number | undefined;
     readonly deduplicate: boolean;
     readonly sortObjectKeys: SortObjectKeysOption;
+    readonly allowStackInError: boolean;
 
     constructor({
         space = undefined,
         deduplicate = false,
         sortObjectKeys = 'catch',
+        allowStackInError = false,
         transformers = [],
         symbols = [],
     }: PowerJsonOptions = {}) {
         this.space = space;
         this.deduplicate = deduplicate;
         this.sortObjectKeys = sortObjectKeys;
+        this.allowStackInError = allowStackInError;
 
         [
-            ...Object.values(baseTransformers),
+            ...baseTransformers,
             ...typedArrayTransformers,
             ...transformers,
         ].forEach(transformer => this.registerTransformer(transformer));

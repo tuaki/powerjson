@@ -7,7 +7,7 @@ import { type Deserializer, getAlgorithmVersion } from './deserializer.ts';
 import { SimpleDeserializer } from './simpleDeserializer.ts';
 import { DeduplicatedDeserializer } from './deduplicatedDeserializer.ts';
 
-export function serialize(value: unknown, config: PowerJsonConfig): JsonObject {
+export function serialize(input: unknown, config: PowerJsonConfig): JsonObject {
     let serializer: Serializer | undefined;
 
     switch (config.version) {
@@ -19,15 +19,15 @@ export function serialize(value: unknown, config: PowerJsonConfig): JsonObject {
             break;
     }
 
-    return serializer.serialize(value);
+    return serializer.serialize(input);
 }
 
 export function deserialize<T = unknown>(jsonValue: JsonObject, config: PowerJsonConfig): T {
-    const value = jsonValue as RootJsonObject;
+    const root = jsonValue as RootJsonObject;
 
     let deserializer: Deserializer | undefined;
 
-    switch (getAlgorithmVersion(value)) {
+    switch (getAlgorithmVersion(root)) {
         case 1:
             deserializer = new SimpleDeserializer(config);
             break;
@@ -36,5 +36,5 @@ export function deserialize<T = unknown>(jsonValue: JsonObject, config: PowerJso
             break;
     }
 
-    return deserializer.deserialize(value) as T;
+    return deserializer.deserialize(root) as T;
 }
