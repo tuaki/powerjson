@@ -1,5 +1,5 @@
 import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
-import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike } from './transformers.ts';
+import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike, type PlainObject } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
 export abstract class Serializer {
@@ -77,7 +77,10 @@ export abstract class Serializer {
     // #endregion
     // #region Objects
 
-    serializePlainObject(value: Record<string, unknown>): AnnotatedJsonObject {
+    // The overload is here for better DX when defining custom transformers (so that we don't have to cast the value to `PlainObject`).
+
+    serializePlainObject<TObject extends ObjectLike>(value: TObject): AnnotatedJsonObject;
+    serializePlainObject(value: PlainObject): AnnotatedJsonObject {
         const prevAnnotations = this.annotations;
         const prevKey = this.key;
         const prevCompositeIndex = this.compositeIndex;

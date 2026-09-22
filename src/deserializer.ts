@@ -1,5 +1,5 @@
 import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AlgorithmVersion, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type RootJsonObject, type TypeId } from './json.ts';
-import { deserializeNumber, validateObjectKey, type ObjectLike, type Primitive } from './transformers.ts';
+import { deserializeNumber, validateObjectKey, type ObjectLike, type PlainObject, type Primitive } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
 export function getAlgorithmVersion(root: RootJsonObject): AlgorithmVersion {
@@ -58,11 +58,15 @@ export abstract class Deserializer {
     // #endregion
     // #region Objects
 
+    // The overloads are here for better DX when defining custom transformers (so that we don't have to cast both `output` and the return value to `PlainObject`).
+
+    deserializePlainObject(value: JsonObject): PlainObject;
+    deserializePlainObject<TObject extends ObjectLike>(value: JsonObject, output: TObject): TObject;
     /**
      * @param output The object to deserialize the fields into. Defaults to a fresh plain object.
      * Custom transformers whose result isn't a plain object can pass their own instance here, so that it (rather than a throwaway placeholder) is registered as this entity's reference target - which matters for self-referencing or circular structures.
      */
-    deserializePlainObject(value: JsonObject, output: Record<string, unknown> = {}): Record<string, unknown> {
+    deserializePlainObject(value: JsonObject, output: PlainObject = {}): PlainObject {
         this.trySetReference(output);
 
         const annotations = value[ESCAPE_CHAR] as Annotations | undefined;

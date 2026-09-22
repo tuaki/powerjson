@@ -107,7 +107,7 @@ export function transformer<TObject extends ObjectLike, TJson extends JsonValue>
 // #region Containers
 
 const plainObjectTransformer = transformer({
-    clazz: Object as unknown as Clazz<Record<string, unknown>>,
+    clazz: Object as unknown as Clazz<PlainObject>,
     type: undefined,
     serialize: (value, serializer) => serializer.serializePlainObject(value),
     deserialize: (value, deserializer) => deserializer.deserializePlainObject(value),
@@ -123,7 +123,9 @@ export function validateObjectKey(key: string) {
         throw new Error(`Invalid object key: ${key}. Remove it to avoid prototype pollution.`);
 }
 
-export function isPlainObject(value: unknown): value is Record<string, unknown> {
+export type PlainObject = Record<string, unknown>;
+
+export function isPlainObject(value: unknown): value is PlainObject {
     if (typeof value !== 'object' || value === null)
         return false;
 
@@ -227,7 +229,7 @@ const errorTransformer = transformer({
         const valueName = value.name;
         const name = nativeErrorConstructorsByName.has(valueName) ? valueName : 'Error';
 
-        const plainObject: Record<string, unknown> = {
+        const plainObject: PlainObject = {
             name,
             message,
         };
@@ -258,7 +260,7 @@ const errorTransformer = transformer({
         // If the message was undefined, it was serialized as `null`, so we convert it back to undefined. Otherwise, it must be a string.
         const error = new constructor(message as string | null ?? undefined);
 
-        deserializer.deserializePlainObject(rest, error as object as Record<string, unknown>);
+        deserializer.deserializePlainObject(rest, error);
 
         // `cause` is a non-enumerable property. Normally, we would pass it through the constructor, but we can't do that because we have to deserialize it first, and for that, the error has to be already instantiated and registered as a reference target.
         // Also, `undefined` vs "not defined" strikes again.

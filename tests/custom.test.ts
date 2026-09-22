@@ -126,135 +126,6 @@ test('class to array', () => {
     });
 });
 
-class Author {
-    constructor(
-        readonly name: string,
-    ) {}
-}
-
-const authorTransformer = transformer({
-    clazz: Author,
-    type: 'Author',
-    // Let's try direct serialization.
-    // This is generally not recommended because it can lead to issues on so many levels.
-    // But anything is possible if you are brave enough.
-    serialize: value => ({ name: value.name }),
-    // For example, this breaks references!
-    // Even though the serialization process will set the reference, there is no way how to access it here.
-    // So, don't do this!
-    // The internal API might be exposed in the future if a really good use case is found, but for now, it remains closed.
-    deserialize: value => new Author((value as { name: string }).name),
-});
-
-class Comment {
-    constructor(
-        readonly author: Author,
-        readonly content: string,
-        readonly createdAt: Date,
-        readonly responses?: Comment[],
-    ) {}
-}
-
-const commentTransformer = transformer({
-    clazz: Comment,
-    type: 'Comment',
-    // This is kinda complex, so we use the built-in object functions.
-    // We could copy the object like this instead of casting it:
-    // serializer.serializePlainObject({
-    //     author: value.author,
-    //     content: value.content,
-    //     createdAt: value.createdAt,
-    //     responses: value.responses,
-    // })
-    // However, since we know that the object is just a plain object without any extra properties, we might as well save some work.
-    // Although this is probably not the best idea in general - for finer control, the explicit copying is better.
-    serialize: (value, serializer) => serializer.serializePlainObject(value as unknown as Record<string, unknown>),
-    deserialize: (value, deserializer) => {
-        const object = deserializer.deserializePlainObject(value) as {
-            author: Author;
-            content: string;
-            createdAt: Date;
-            responses?: Comment[];
-        };
-
-        return new Comment(object.author, object.content, object.createdAt, object.responses);
-    },
-});
-
-test('recursively nested classes', () => {
-    const tester = Tester.createForAll([ authorTransformer, commentTransformer ]);
-
-    const alice = new Author('Alice');
-    const bob = new Author('Bob');
-    const charlie = new Author('Charlie');
-    const eve = new Author('Eve');
-
-    const input = new Comment(alice, 'Root comment', new Date('2001-01-01T00:00:00.000Z'), [
-        new Comment(eve, 'First reply', new Date('2002-02-02T00:00:00.000Z'), [
-            // No responses to this one.
-        ]),
-        new Comment(bob, 'Second reply', new Date('2003-03-03T00:00:00.000Z'), [
-            new Comment(charlie, 'Nested reply', new Date('2004-04-04T00:00:00.000Z')),
-            // Also not here but we use undefined for that.
-        ]),
-    ]);
-
-    // We skip the first deserialization test because it would be literally the same thing except for the one reference (which is not the focus here).
-    tester.serializeDeserialize({ input }, {
-        $: {
-            input: 'Comment',
-        },
-        input: {
-            $: {
-                author: 'Author',
-                createdAt: 'Date',
-                responses: { 1: 'Comment', 2: 'Comment' },
-            },
-            author: {
-                name: 'Alice',
-            },
-            content: 'Root comment',
-            createdAt: '2001-01-01T00:00:00.000Z',
-            responses: [ {
-                $: {
-                    author: 'Author',
-                    createdAt: 'Date',
-                },
-                author: {
-                    name: 'Eve',
-                },
-                content: 'First reply',
-                createdAt: '2002-02-02T00:00:00.000Z',
-                responses: [],
-            }, {
-                $: {
-                    author: 'Author',
-                    createdAt: 'Date',
-                    responses: { 1: 'Comment' },
-                },
-                author: {
-                    name: 'Bob',
-                },
-                content: 'Second reply',
-                createdAt: '2003-03-03T00:00:00.000Z',
-                responses: [ {
-                    $: {
-                        author: 'Author',
-                        createdAt: 'Date',
-                        responses: 'undefined',
-                    },
-                    author: {
-                        name: 'Charlie',
-                    },
-                    content: 'Nested reply',
-                    createdAt: '2004-04-04T00:00:00.000Z',
-                    responses: null,
-                } ],
-            } ],
-        },
-    });
-});
-
 class User {
     constructor(
         readonly id: number,
@@ -264,20 +135,20 @@ class User {
     ) {}
 }
 
+
 const userTransformer = transformer({
     clazz: User,
     type: 'User',
-    serialize: (value, serializer) => serializer.serializePlainObject(value as unknown as Record<string, unknown>),
-    deserialize: (value, deserializer) => {
-        // This is probably the most efficient way how to deserialize custom types while still running their constructors and supporting circular references.
-        // The instance will be registered correctly, because it's passed as the `output` parameter to `deserializePlainObject`.
-
-        // @ts-expect-error - We will fill the object later.
-        const user = new User();
-        // `Object.create(User.prototype)` would work without silencing TS, but it would not call the constructor which is a major red flag.
-
-        return deserializer.deserializePlainObject(value, user as unknown as Record<string, unknown>) as object as User;
-    },
+    // This is kinda complex, so we use the built-in object functions.
+    // We could copy the object like this:
+    // `serializer.serializePlainObject({ id: value.id, name: value.name, friends: value.friends, createdAt: value.createdAt, responses: value.responses });`
+    // However, since we know that the object is just a plain object without any extra properties, we might as well save some work.
+    serialize: (value, serializer) => serializer.serializePlainObject(value),
+    // This is the best way how to deserialize custom types while still running their constructors and supporting circular references.
+    // The instance will be registered correctly, because it's passed as the `output` parameter to `deserializePlainObject`.
+    // `Object.create(User.prototype)` would work without silencing TS, but it would not call the constructor which is a major red flag.
+    // @ts-expect-error - We will fill the object later.
+    deserialize: (value, deserializer) => deserializer.deserializePlainObject(value, new User()),
     // Users can befriend one another (even themselves), so they must be tracked as entities to support circular references.
     isEntity: true,
 });
@@ -365,6 +236,126 @@ describe('circular references between custom types', () => {
                 createdAt: '2020-01-01T00:00:00.000Z',
             },
         });
+    });
+});
+
+class Author {
+    constructor(
+        readonly name: string,
+    ) {}
+}
+
+const authorTransformer = transformer({
+    clazz: Author,
+    type: 'Author',
+    // Let's try direct serialization.
+    // This is generally not recommended because it can lead to issues on so many levels.
+    // But anything is possible if you are brave enough.
+    serialize: value => ({ name: value.name }),
+    // For example, this breaks references!
+    // Even though the serialization process will set the reference, there is no way how to access it here.
+    // So, don't do this!
+    // The internal API might be exposed in the future if a really good use case is found, but for now, it remains closed.
+    deserialize: value => new Author((value as { name: string }).name),
+});
+
+class Comment {
+    constructor(
+        readonly author: Author,
+        readonly content: string,
+        readonly createdAt: Date,
+        readonly responses?: Comment[],
+    ) {}
+}
+
+const commentTransformer = transformer({
+    clazz: Comment,
+    type: 'Comment',
+    serialize: (value, serializer) => serializer.serializePlainObject(value),
+    // This works but breaks references and creates an additional throwaway object. But if we don't use references (and need, for example, to run the constructor with full parameters), this is also a good choice.
+    deserialize: (value, deserializer) => {
+        const object = deserializer.deserializePlainObject(value) as {
+            author: Author;
+            content: string;
+            createdAt: Date;
+            responses?: Comment[];
+        };
+
+        return new Comment(object.author, object.content, object.createdAt, object.responses);
+    },
+});
+
+test('recursively nested classes', () => {
+    const tester = Tester.createForAll([ authorTransformer, commentTransformer ]);
+
+    const alice = new Author('Alice');
+    const bob = new Author('Bob');
+    const charlie = new Author('Charlie');
+    const eve = new Author('Eve');
+
+    const input = new Comment(alice, 'Root comment', new Date('2001-01-01T00:00:00.000Z'), [
+        new Comment(eve, 'First reply', new Date('2002-02-02T00:00:00.000Z'), [
+            // No responses to this one.
+        ]),
+        new Comment(bob, 'Second reply', new Date('2003-03-03T00:00:00.000Z'), [
+            new Comment(charlie, 'Nested reply', new Date('2004-04-04T00:00:00.000Z')),
+            // Also not here but we use undefined for that.
+        ]),
+    ]);
+
+    // We skip the first deserialization test because it would be literally the same thing except for the one reference (which is not the focus here).
+    tester.serializeDeserialize({ input }, {
+        $: {
+            input: 'Comment',
+        },
+        input: {
+            $: {
+                author: 'Author',
+                createdAt: 'Date',
+                responses: { 1: 'Comment', 2: 'Comment' },
+            },
+            author: {
+                name: 'Alice',
+            },
+            content: 'Root comment',
+            createdAt: '2001-01-01T00:00:00.000Z',
+            responses: [ {
+                $: {
+                    author: 'Author',
+                    createdAt: 'Date',
+                },
+                author: {
+                    name: 'Eve',
+                },
+                content: 'First reply',
+                createdAt: '2002-02-02T00:00:00.000Z',
+                responses: [],
+            }, {
+                $: {
+                    author: 'Author',
+                    createdAt: 'Date',
+                    responses: { 1: 'Comment' },
+                },
+                author: {
+                    name: 'Bob',
+                },
+                content: 'Second reply',
+                createdAt: '2003-03-03T00:00:00.000Z',
+                responses: [ {
+                    $: {
+                        author: 'Author',
+                        createdAt: 'Date',
+                        responses: 'undefined',
+                    },
+                    author: {
+                        name: 'Charlie',
+                    },
+                    content: 'Nested reply',
+                    createdAt: '2004-04-04T00:00:00.000Z',
+                    responses: null,
+                } ],
+            } ],
+        },
     });
 });
 
