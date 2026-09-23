@@ -9,8 +9,6 @@ export function repeatedTemporalValuesScenario(): Scenario {
         iterations: 100,
         batches: 10,
         getData: createRepeatedTemporalValues,
-        // Too slow.
-        skipSerializers: [ 'next-json' ],
     };
 }
 

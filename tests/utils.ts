@@ -5,11 +5,11 @@ import type { PowerJsonOptions } from '../src/config.ts';
 
 export function wrap(value: JsonValue, annotation?: Annotations[string]): JsonObject {
     return {
+        w: value,
         $: {
             ...(annotation === undefined ? {} : { w: annotation }),
             wrapped: true,
         },
-        w: value,
     };
 }
 

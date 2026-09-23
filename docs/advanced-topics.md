@@ -67,10 +67,10 @@ Annotations for properties of an object are stored in the `$` property of the ob
 
 ```ts
 {
+    a: 'NaN',
     $: {
         a: 'number',
     },
-    a: 'NaN',
 };
 ```
 
@@ -80,12 +80,12 @@ Arrays (and array-like structures, i.e., `Set` and `Map`) can also have annotati
 
 ```ts
 {
-    $: {
-        m: { 0: 'Map', 2: 'number', 3: 'undefined' },
-    },
     m: [ 
         [ 'NaN', 'undefined' ],
     ],
+    $: {
+        m: { 0: 'Map', 2: 'number', 3: 'undefined' },
+    },
 }
 ```
 
@@ -104,11 +104,11 @@ PowerJson uses different serialization algorithms for different configurations. 
 
 ```ts
 {
-    $: {
-        $: 1,
-        ...
-    },
     ...
+    $: {
+        ...
+        $: 1,
+    },
 }
 ```
 
@@ -118,11 +118,11 @@ Primitive values, arrays, and custom classes need to be wrapped to a plain objec
 
 ```ts
 {
+    w: 'NaN',
     $: {
+        w: 'number',
         $: 1,
         wrapped: true,
-        w: 'number',
     },
-    w: 'NaN',
 }
 ```

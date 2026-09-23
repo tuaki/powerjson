@@ -9,8 +9,6 @@ export function smallPayloadBurstScenario(): Scenario {
         iterations: 100,
         batches: 5,
         getData: createSmallPayloadBursts,
-        // Too slow.
-        skipSerializers: [ 'next-json' ],
     };
 }
 

@@ -34,7 +34,7 @@ sudo BENCHMARK_CPU=0 bun run --expose-gc benchmarks/index.ts
 sudo BENCHMARK_CPU=2 node --expose-gc benchmarks/index.ts
 ```
 
-Crucially, check your CPU's topology before assigning logical CPUs. For example, [our CPU](#configuration) assigns both 0 and 1 to the same physical core, which is why we use 0 and 2 instead. Additionally, some physical cores are more powerful than others, so run the benchmarks on cores of the same quality.
+Crucially, check your CPU's topology before assigning logical CPUs (e.g., using `lscpu -e`). For example, [our CPU](#configuration) assigns both 0 and 1 to the same physical core, which is why we use 0 and 2 instead. Additionally, some physical cores are more powerful than others, so run the benchmarks on cores of the same quality.
 
 Benchmark inputs are deterministic through the seed and reference date in `benchmarks/config.ts`. There you can adjust `BENCHMARK_ITERATIONS_SCALE` to increase the sample size when investigating performance; use values of at least `1` for meaningful comparisons. Avoid treating an individual benchmark run as conclusive because runtime noise can affect results.
 
@@ -48,7 +48,7 @@ Benchmark inputs are deterministic through the seed and reference date in `bench
 | -------------------- | ------- |
 | bun                  | 1.4.0   |
 | node                 | 26.8.1  |
-| powerjson            | 0.0.2   |
+| powerjson            | 1.0.0   |
 | superjson            | 2.2.6   |
 | devalue              | 5.9.1   |
 | next-json            | 0.5.1   |
@@ -60,68 +60,68 @@ The results are displayed as relative values (i.e., the best result is always 1.
 
 ### Bun - stringify
 
-| scenario                 | Best (ms) | powerjson v1      | powerjson v2    | superjson v1 | superjson v2 | devalue         | serialize-javascript | next-json   |
-| ------------------------ | --------- | ----------------- | --------------- | ------------ | ------------ | --------------- | -------------------- | ----------- |
-| Realistic API Call       | 10.975    | **1.00 ± 0.08**   | 1.38 ± 0.11     | 6.3 ± 0.4    | 6.3 ± 0.4    | 2.7 ± 0.4       | 2.41 ± 0.14          | -           |
-| Small Payload Burst      | 5.443     | **1.000 ± 0.011** | 1.36 ± 0.10     | 4.93 ± 0.17  | 4.9 ± 0.2    | 3.44 ± 0.06     | 3.33 ± 0.13          | -           |
-| Shared References        | 1.064     | 1.52 ± 0.19       | **1.00 ± 0.07** | 5.1 ± 0.3    | 2.50 ± 0.18  | 2.17 ± 0.20     | 5.0 ± 0.3            | 1.44 ± 0.13 |
-| Circular References      | 0.010     | 3298 ± 260        | 2.2 ± 0.2       | 54 ± 5       | *NaN*        | **1.00 ± 0.11** | *NaN*                | 7 ± 5       |
-| Repeated Temporal Values | 0.950     | **1.00 ± 0.06**   | 1.12 ± 0.13     | 8.7 ± 0.5    | 4.9 ± 0.3    | 4.6 ± 0.2       | 5.3 ± 0.3            | -           |
-| Mixed Extended Types     | 0.024     | **1.00 ± 0.11**   | 1.10 ± 0.12     | 6.1 ± 0.7    | 6.1 ± 0.6    | 1.7 ± 0.3       | 3.2 ± 0.3            | 2.2 ± 0.3   |
+| scenario                 | Best (ms) | powerjson v1    | powerjson v2    | superjson v1 | superjson v2 | devalue         | serialize-javascript | next-json   |
+| ------------------------ | --------- | --------------- | --------------- | ------------ | ------------ | --------------- | -------------------- | ----------- |
+| Realistic API Call       | 11.595    | **1.00 ± 0.06** | 1.57 ± 0.10     | 6.5 ± 0.6    | 6.3 ± 0.4    | 2.6 ± 0.2       | 2.45 ± 0.13          | 2.7 ± 0.2   |
+| Small Payload Burst      | 5.982     | **1.00 ± 0.05** | 1.23 ± 0.05     | 4.49 ± 0.16  | 4.59 ± 0.16  | 3.09 ± 0.15     | 2.90 ± 0.10          | 3.24 ± 0.12 |
+| Shared References        | 1.079     | 1.50 ± 0.20     | **1.00 ± 0.10** | 5.2 ± 0.4    | 2.45 ± 0.18  | 2.04 ± 0.20     | 5.2 ± 0.4            | 1.48 ± 0.12 |
+| Circular References      | 0.013     | 3210 ± 417      | 2.2 ± 0.3       | 46 ± 7       | *NaN*        | **1.00 ± 0.18** | *NaN*                | 8 ± 5       |
+| Repeated Temporal Values | 1.086     | **1.00 ± 0.13** | 1.07 ± 0.15     | 8.6 ± 0.8    | 5.0 ± 0.5    | 4.5 ± 0.6       | 5.6 ± 0.6            | 3.1 ± 0.4   |
+| Mixed Extended Types     | 0.025     | **1.00 ± 0.12** | 1.07 ± 0.13     | 5.9 ± 0.6    | 5.9 ± 0.7    | 1.7 ± 0.3       | 3.1 ± 0.3            | 2.1 ± 0.2   |
+
 
 ### Bun - parse
 
-| scenario                 | Best (ms) | powerjson v1    | powerjson v2    | superjson v1 | superjson v2 | devalue         | serialize-javascript | next-json  |
-| ------------------------ | --------- | --------------- | --------------- | ------------ | ------------ | --------------- | -------------------- | ---------- |
-| Realistic API Call       | 12.311    | 1.08 ± 0.09     | **1.00 ± 0.05** | 2.7 ± 0.3    | 2.41 ± 0.09  | 1.15 ± 0.05     | 4.16 ± 0.16          | -          |
-| Small Payload Burst      | 5.767     | **1.00 ± 0.06** | 1.13 ± 0.07     | 1.58 ± 0.12  | 1.61 ± 0.09  | 1.90 ± 0.19     | 9.8 ± 0.7            | -          |
-| Shared References        | 0.638     | 3.5 ± 0.3       | **1.00 ± 0.13** | 11.5 ± 1.2   | 3.8 ± 1.2    | **1.04 ± 0.11** | 12.2 ± 1.1           | 33 ± 3     |
-| Circular References      | 0.006     | 3187 ± 201      | 1.96 ± 0.17     | 53 ± 9       | *NaN*        | **1.00 ± 0.09** | *NaN*                | 41 ± 5     |
-| Repeated Temporal Values | 1.218     | **1.00 ± 0.12** | **1.01 ± 0.14** | 6.2 ± 0.6    | 2.6 ± 0.2    | 1.17 ± 0.13     | 5.8 ± 0.5            | -          |
-| Mixed Extended Types     | 0.023     | **1.02 ± 0.17** | **1.00 ± 0.15** | 2.4 ± 0.3    | 2.3 ± 0.3    | 1.22 ± 0.15     | 4.0 ± 0.5            | 11.3 ± 1.3 |
+| scenario                 | Best (ms) | powerjson v1    | powerjson v2      | superjson v1 | superjson v2 | devalue         | serialize-javascript | next-json  |
+| ------------------------ | --------- | --------------- | ----------------- | ------------ | ------------ | --------------- | -------------------- | ---------- |
+| Realistic API Call       | 13.139    | 1.08 ± 0.03     | **1.000 ± 0.018** | 2.77 ± 0.06  | 2.50 ± 0.06  | 1.16 ± 0.03     | 4.16 ± 0.17          | 31 ± 2     |
+| Small Payload Burst      | 5.844     | **1.00 ± 0.03** | 1.09 ± 0.02       | 1.60 ± 0.06  | 1.57 ± 0.06  | 1.82 ± 0.04     | 9.45 ± 0.20          | 24.2 ± 0.5 |
+| Shared References        | 0.629     | 3.7 ± 0.3       | **1.00 ± 0.11**   | 12.5 ± 1.3   | 3.3 ± 0.3    | 1.11 ± 0.10     | 12.8 ± 1.0           | 34 ± 3     |
+| Circular References      | 0.008     | 3025 ± 306      | 2.1 ± 0.3         | 51 ± 9       | *NaN*        | **1.00 ± 0.13** | *NaN*                | 35 ± 5     |
+| Repeated Temporal Values | 1.303     | **1.02 ± 0.16** | **1.00 ± 0.17**   | 6.3 ± 0.8    | 2.7 ± 0.4    | 1.2 ± 0.2       | 6.2 ± 0.8            | 42 ± 5     |
+| Mixed Extended Types     | 0.023     | **1.03 ± 0.18** | **1.00 ± 0.17**   | 2.3 ± 0.4    | 2.3 ± 0.3    | 1.19 ± 0.19     | 3.9 ± 0.5            | 11.2 ± 1.6 |
 
 ### Node - stringify
 
-| scenario                 | Best (ms) | powerjson v1      | powerjson v2    | superjson v1 | superjson v2 | devalue       | serialize-javascript | next-json   |
-| ------------------------ | --------- | ----------------- | --------------- | ------------ | ------------ | ------------- | -------------------- | ----------- |
-| Realistic API Call       | 22.105    | **1.000 ± 0.003** | **1.04 ± 0.08** | 3.70 ± 0.12  | 3.37 ± 0.06  | 1.58 ± 0.06   | 1.49 ± 0.12          | -           |
-| Small Payload Burst      | 24.894    | 1.4 ± 0.2         | **1.0 ± 0.5**   | 1.93 ± 0.15  | 1.87 ± 0.16  | 1.2 ± 0.4     | **1.00 ± 0.10**      | -           |
-| Shared References        | 1.788     | 3.6 ± 0.5         | **1.00 ± 0.10** | 5.7 ± 0.4    | 2.00 ± 0.18  | 1.27 ± 0.12   | 4.9 ± 0.4            | 1.57 ± 0.12 |
-| Circular References      | 0.044     | 940 ± 410         | 2.2 ± 1.3       | 12 ± 5       | *NaN*        | **1.0 ± 0.6** | *NaN*                | 4 ± 2       |
-| Repeated Temporal Values | 2.744     | **1.00 ± 0.11**   | 1.07 ± 0.11     | 4.2 ± 0.4    | 1.9 ± 0.2    | 1.40 ± 0.17   | 2.16 ± 0.19          | -           |
-| Mixed Extended Types     | 0.071     | **1.00 ± 0.10**   | **1.04 ± 0.10** | 2.5 ± 0.2    | 2.5 ± 0.2    | 1.09 ± 0.10   | 1.39 ± 0.13          | 1.42 ± 0.12 |
+| scenario                 | Best (ms) | powerjson v1 | powerjson v2       | superjson v1 | superjson v2 | devalue       | serialize-javascript | next-json   |
+| ------------------------ | --------- | ------------ | ------------------ | ------------ | ------------ | ------------- | -------------------- | ----------- |
+| Realistic API Call       | 21.965    | **1.00 ± 0.19** | 1.40 ± 0.19     | 4.2 ± 0.6    | 3.9 ± 0.6    | 1.8 ± 0.3     | 1.6 ± 0.2            | 1.8 ± 0.3   |
+| Small Payload Burst      | 13.024    | **1.00 ± 0.04** | **1.03 ± 0.13** | 3.14 ± 0.16  | 3.1 ± 0.2    | 2.05 ± 0.16   | 1.67 ± 0.07          | 1.91 ± 0.10 |
+| Shared References        | 1.612     | 2.4 ± 0.2       | **1.00 ± 0.04** | 5.4 ± 0.2    | 1.95 ± 0.13  | 1.14 ± 0.04   | 4.76 ± 0.16          | 1.15 ± 0.05 |
+| Circular References      | 0.055     | 910 ± 391       | 2.2 ± 1.3       | 11 ± 5       | *NaN*        | **1.0 ± 0.6** | *NaN*                | 2.6 ± 1.3   |
+| Repeated Temporal Values | 2.438     | **1.00 ± 0.10** | 1.08 ± 0.09     | 4.4 ± 0.3    | 1.93 ± 0.15  | 1.45 ± 0.11   | 2.35 ± 0.18          | 1.31 ± 0.10 |
+| Mixed Extended Types     | 0.064     | **1.00 ± 0.08** | **1.03 ± 0.08** | 2.51 ± 0.16  | 2.48 ± 0.15  | 1.10 ± 0.07   | 1.39 ± 0.09          | 1.33 ± 0.08 |
 
 ### Node - parse
 
-| scenario                 | Best (ms) | powerjson v1 | powerjson v2 | superjson v1 | superjson v2 | devalue         | serialize-javascript | next-json  |
-| ------------------------ | --------- | ------------ | ------------ | ------------ | ------------ | --------------- | -------------------- | ---------- |
-| Realistic API Call       | 15.964    | 1.48 ± 0.14  | 1.38 ± 0.13  | 2.25 ± 0.04  | 2.10 ± 0.09  | **1.00 ± 0.02** | 2.85 ± 0.05          | -          |
-| Small Payload Burst      | 12.715    | 1.5 ± 0.3    | 1.4 ± 0.2    | 1.6 ± 0.3    | 1.6 ± 0.3    | **1.0 ± 0.2**   | 1.6 ± 0.3            | -          |
-| Shared References        | 0.793     | 6.9 ± 0.6    | 2.1 ± 0.3    | 11.3 ± 1.0   | 2.5 ± 0.2    | **1.00 ± 0.12** | 8 ± 5                | 38 ± 3     |
-| Circular References      | 0.016     | 3259 ± 856   | 3.7 ± 1.2    | 33 ± 6       | *NaN*        | **1.0 ± 0.2**   | *NaN*                | 53 ± 10    |
-| Repeated Temporal Values | 1.127     | 2.7 ± 0.3    | 2.8 ± 0.3    | 6.5 ± 0.7    | 2.1 ± 0.2    | **1.00 ± 0.13** | 2.8 ± 0.3            | -          |
-| Mixed Extended Types     | 0.034     | 1.9 ± 0.2    | 1.9 ± 0.2    | 2.4 ± 0.2    | 2.4 ± 0.2    | 1.34 ± 0.13     | **1.00 ± 0.11**      | 12.7 ± 1.1 |
+| scenario                 | Best (ms) | powerjson v1 | powerjson v2 | superjson v1 | superjson v2 | devalue           | serialize-javascript | next-json  |
+| ------------------------ | --------- | ------------ | ------------ | ------------ | ------------ | ----------------- | -------------------- | ---------- |
+| Realistic API Call       | 17.293    | 1.47 ± 0.11  | 1.6 ± 0.3    | 2.4 ± 0.2    | 2.16 ± 0.16  | **1.00 ± 0.09**   | 3.0 ± 0.2            | 23.5 ± 1.6 |
+| Small Payload Burst      | 12.548    | 1.25 ± 0.05  | 1.20 ± 0.04  | 1.36 ± 0.02  | 1.37 ± 0.04  | **1.000 ± 0.019** | 1.34 ± 0.05          | 12.4 ± 0.2 |
+| Shared References        | 0.638     | 7.1 ± 0.3    | 2.21 ± 0.07  | 12.2 ± 0.3   | 2.59 ± 0.08  | **1.00 ± 0.03**   | 9 ± 5                | 41.7 ± 1.1 |
+| Circular References      | 0.041     | 1516 ± 1492  | 2 ± 2        | 15 ± 14      | *NaN*        | **1.0 ± 1.4**     | *NaN*                | 22 ± 21    |
+| Repeated Temporal Values | 1.007     | 2.90 ± 0.18  | 2.99 ± 0.20  | 6.9 ± 0.4    | 2.21 ± 0.13  | **1.00 ± 0.07**   | 2.93 ± 0.18          | 51 ± 2     |
+| Mixed Extended Types     | 0.031     | 1.88 ± 0.19  | 1.88 ± 0.18  | 2.4 ± 0.2    | 2.3 ± 0.2    | 1.32 ± 0.12       | **1.00 ± 0.10**      | 12.6 ± 0.9 |
 
 ### Size
 
 | scenario                 | Best (MB) | powerjson v1 | powerjson v2 | superjson v1 | superjson v2 | devalue  | serialize-javascript | next-json |
 | ------------------------ | --------- | ------------ | ------------ | ------------ | ------------ | -------- | -------------------- | --------- |
-| Example                  | 0.017     | 1.38         | 1.24         | 1.55         | 1.39         | 1.09     | 1.18                 | **1.00**  |
-| Realistic API Call       | 1.793     | 1.27         | 1.14         | 1.42         | 1.27         | **1.00** | 1.09                 | -         |
-| Small Payload Burst      | 1.137     | 1.09         | 1.09         | 1.19         | 1.19         | 1.08     | **1.00**             | -         |
+| Realistic API Call       | 1.645     | 1.38         | 1.24         | 1.55         | 1.39         | 1.09     | 1.19                 | **1.00**  |
+| Small Payload Burst      | 1.075     | 1.15         | 1.15         | 1.26         | 1.26         | 1.14     | 1.06                 | **1.00**  |
 | Shared References        | 0.091     | 5.60         | 1.67         | 6.90         | 1.75         | 1.13     | 5.27                 | **1.00**  |
 | Circular References      | 0.001     | 6.7e+3       | 2.79         | 147          | 4.78         | **1.00** | *NaN*                | 1.47      |
-| Repeated Temporal Values | 0.235     | 1.79         | 1.79         | 2.35         | 1.33         | **1.00** | 1.57                 | -         |
+| Repeated Temporal Values | 0.210     | 2.00         | 2.00         | 2.62         | 1.49         | 1.12     | 1.76                 | **1.00**  |
 | Mixed Extended Types     | 0.002     | 1.36         | 1.36         | 1.47         | 1.46         | 1.15     | 1.11                 | **1.00**  |
 
 ## Discussion
 
-Both `serialize-javascript` and `next-json` use a custom grammar to extend the JSON format, allowing them to achieve smaller sizes in some scenarios. The price for this is inability to use the built-in `JSON.parse` and `JSON.stringify` functions, which are highly optimized in both Node and Bun, thus resulting in a poor performance. Specifically `next-json` is skipped in several scenarios because its abysmal performance causes significant delays.
+Both `serialize-javascript` and `next-json` use a custom grammar to extend the JSON format, allowing them to achieve smaller sizes in most scenarios. The price for this is inability to use the built-in `JSON.parse` and `JSON.stringify` functions, which are highly optimized in both Node and Bun, thus resulting in a poor performance. Specifically `next-json` is abysmal for parsing.
 
-`devalue` uses a specific, non-human-readable serialization scheme (that is, however, still a valid JSON). This allows it to achieve the smallest or close-to-smallest sizes in most scenarios, while still being one of the fastest libraries. If you don't care about human-readability or long-term stability of the serialized format, `devalue` is a great choice.
+`devalue` uses a specific, non-human-readable serialization scheme (that is, however, still a valid JSON). This allows it to achieve the smallest or close-to-smallest sizes in all scenarios, while still being one of the fastest libraries. If you don't care about human-readability or long-term stability of the serialized format, `devalue` is a great choice.
 
-Both `powerjson` and `superjson` are generally OK in terms of size, except for scenarios with a lot of references without deduplication. Specifically, `v1` of both libraries explodes in the *Circular References* scenario. However, `v2` fixes this issue. Besides that, `powerjson` produces almost everywhere smaller output than `superjson`.
+Both `powerjson` and `superjson` are generally OK in terms of size, except for scenarios with a lot of references without deduplication. Specifically, `v1` of both libraries explode in the *Circular References* scenario. However, `v2` fixes this issue. Besides that, `powerjson` produces almost everywhere smaller output than `superjson`.
 
 When it comes to speed, `powerjson`, again, outperforms `superjson` in almost every scenario, usually several times over. A much closer match is `powerjson` vs `devalue`, where the latter has an edge in parsing on Node, but `powerjson` is generally faster in other cases.
 
-Another takeaway is that Bun is in most scenarios faster than Node, and in some of them, it's not particularly close. We also run the benchmarks with switched CPUs to rule out any bias there, and the results are consistent.
+Another takeaway is that Bun is in most scenarios faster than Node, and in some of them, it's not particularly close.

@@ -13,9 +13,10 @@ export abstract class Serializer {
         // If the top-level value isn't a plain object, we have to wrap it so that it can put its annotations somewhere.
         const isWrapped = !isPlainObject(input);
 
-        const inputObject = isWrapped ? { [WRAPPED_KEY]: input } : input;
-        this.trySetReference(inputObject);
-        const serialized = this.serializePlainObject(inputObject);
+        const rootObject = isWrapped ? { [WRAPPED_KEY]: input } : input;
+        this.trySetReference(rootObject);
+
+        const serialized = this.serializeRootObject(rootObject);
 
         let annotations = serialized[ESCAPE_CHAR];
         if (annotations === undefined) {
@@ -29,6 +30,8 @@ export abstract class Serializer {
 
         return serialized as RootJsonObject;
     }
+
+    protected abstract serializeRootObject(input: PlainObject): AnnotatedJsonObject;
 
     // #region Context
 
@@ -64,8 +67,8 @@ export abstract class Serializer {
         }
     }
 
-    /** Clears annotations from the object if they are not needed. */
-    protected abstract cleanupAnnotations(value: AnnotatedJsonObject): void;
+    /** Store object and its empty annotations for later processing (if needed). */
+    protected abstract storeEmptyAnnotation(value: AnnotatedJsonObject, annotations: Annotations): void;
 
     // #endregion
     // #region References
@@ -90,7 +93,7 @@ export abstract class Serializer {
         // Explicitly creating the annotations also forces the escape key to be in the first position of each object. This is just a visual thing, but it makes it easier to read the output.
         // If not needed, the annotations will be deleted later.
         const annotations: Annotations = {};
-        const output: AnnotatedJsonObject = { [ESCAPE_CHAR]: annotations };
+        const output: AnnotatedJsonObject = {};
         this.annotations = annotations;
 
         const keys = Object.keys(value);
@@ -119,7 +122,10 @@ export abstract class Serializer {
             output[key] = serializedItem;
         }
 
-        this.cleanupAnnotations(output);
+        if (isAnnotationsNotEmpty(annotations))
+            output[ESCAPE_CHAR] = annotations;
+        else
+            this.storeEmptyAnnotation(output, annotations);
 
         // Context switch
 
@@ -250,10 +256,10 @@ export abstract class Serializer {
     // #endregion
 }
 
-export function deleteEscapeKeyIfEmpty(value: AnnotatedJsonObject) {
+export function isAnnotationsNotEmpty(annotations: Annotations): boolean {
     // We want to check if the escape key is empty. This should be faster than Object.keys(...).length === 0 because the first operation has to first create an array of all keys.
-    for (const _ in value[ESCAPE_CHAR]!)
-        return;
+    for (const _ in annotations)
+        return true;
 
-    delete value[ESCAPE_CHAR];
+    return false;
 }

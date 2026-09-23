@@ -1,33 +1,39 @@
-import { REFERENCE_ANNOTATION, type AnnotatedJsonObject, type TypeId, type Annotations, type JsonObject, type EntityId, type CompositeAnnotation, type RootJsonObject } from './json.ts';
-import { deleteEscapeKeyIfEmpty, Serializer } from './serializer.ts';
-import type { ObjectLike } from './transformers.ts';
+import { REFERENCE_ANNOTATION, type AnnotatedJsonObject, type TypeId, type Annotations, type EntityId, type CompositeAnnotation, ESCAPE_CHAR } from './json.ts';
+import { isAnnotationsNotEmpty, Serializer } from './serializer.ts';
+import type { ObjectLike, PlainObject } from './transformers.ts';
 
 export class DeduplicatedSerializer extends Serializer {
-    override serialize(input: unknown): RootJsonObject {
-        const serialized = super.serialize(input);
+    protected override serializeRootObject(input: PlainObject) {
+        const serialized = this.serializePlainObject(input);
 
         addIdentityAnnotations(this.seenEntities);
 
-        this.cleanupEmptyAnnotations();
+        this.addNonEmptyAnnotations();
 
         return serialized;
     }
 
     // #region Annotations
 
-    // The annotation cleanup is delayed until the end of serialization because we need to know if an entity is referenced or not. If it is, we need to add an identity annotation to it, which means that the annotations object will not be empty.
+    // We don't want empty annotations objects in the output. However, we can't just throw them away because a references might be added to them later. So, we store them all and revisit them later.
 
-    private cleanupEmptyAnnotations() {
-        const allJsonObjects = this.allJsonObjects;
-        const length = allJsonObjects.length;
-        for (let i = 0; i < length; i++)
-            deleteEscapeKeyIfEmpty(allJsonObjects[i]);
+    private addNonEmptyAnnotations() {
+        const length = this.objectAnnotationPairs.length;
+        for (let i = 0; i < length; i += 2) {
+            const annotations = this.objectAnnotationPairs[i + 1] as Annotations;
+
+            if (isAnnotationsNotEmpty(annotations)) {
+                const value = this.objectAnnotationPairs[i] as AnnotatedJsonObject;
+                value[ESCAPE_CHAR] = annotations;
+            }
+        }
     }
 
-    private readonly allJsonObjects: JsonObject[] = [];
+    /** A list of all objects and their corresponding annotations that need to be processed after serialization. */
+    private readonly objectAnnotationPairs: (AnnotatedJsonObject | Annotations)[] = [];
 
-    protected override cleanupAnnotations(value: AnnotatedJsonObject) {
-        this.allJsonObjects.push(value);
+    protected override storeEmptyAnnotation(value: AnnotatedJsonObject, annotations: Annotations) {
+        this.objectAnnotationPairs.push(value, annotations);
     }
 
     // #endregion

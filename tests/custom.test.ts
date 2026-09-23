@@ -23,6 +23,7 @@ test('ignores private properties', () => {
     const input = new PrivateClass(1, 2);
 
     // Private properties are not enumerable, so they should be just ignored.
+    // The same goes for getters, which are also not enumerable.
     tester.serialize({ input }, (serialized, serializer) => {
         const expected = Tester.addVersionToSerialized(serializer, {
             input: {
@@ -47,8 +48,8 @@ test('Luxon DateTime to ISO string', () => {
     const serialized = input.toISO()!;
 
     tester.serializeDeserialize({ input }, {
-        $: { input: 'DateTime' },
         input: serialized,
+        $: { input: 'DateTime' },
     });
 
     tester.serializeDeserialize(input, wrap(serialized, 'DateTime'));
@@ -78,8 +79,8 @@ test('class to primitive', () => {
     const input = SimpleDateTime.create('Bazinga!');
 
     tester.serializeDeserialize({ input }, {
-        $: { input: 'SDT' },
         input: 'Bazinga!',
+        $: { input: 'SDT' },
     });
 
     tester.serializeDeserialize(input, wrap('Bazinga!', 'SDT'));
@@ -118,11 +119,11 @@ test('class to array', () => {
     ];
 
     tester.serializeDeserialize({ input }, {
-        $: { input: { 1: 'Point', 4: 'undefined', 5: 'Point' } },
         input: [
             [ 6, 9, null ],
             [ 4, 2, 0 ],
         ],
+        $: { input: { 1: 'Point', 4: 'undefined', 5: 'Point' } },
     });
 });
 
@@ -161,23 +162,23 @@ describe('circular references between custom types', () => {
         alice.friends.push(alice);
 
         tester.serializeDeserialize({ input: alice }, {
+            input: {
+                id: 1,
+                name: 'Alice',
+                friends: [ 1 ],
+                createdAt: '2020-01-01T00:00:00.000Z',
+                $: { friends: { 1: 'ref' }, createdAt: 'Date' },
+            },
             $: { input: 'User' },
-            input: {
-                $: { friends: { 1: 'ref' }, createdAt: 'Date' },
-                id: 1,
-                name: 'Alice',
-                friends: [ 1 ],
-                createdAt: '2020-01-01T00:00:00.000Z',
-            },
         }, {
-            $: { input: [ 'User', 1 ] },
             input: {
-                $: { friends: { 1: 'ref' }, createdAt: 'Date' },
                 id: 1,
                 name: 'Alice',
                 friends: [ 1 ],
                 createdAt: '2020-01-01T00:00:00.000Z',
+                $: { friends: { 1: 'ref' }, createdAt: 'Date' },
             },
+            $: { input: [ 'User', 1 ] },
         });
     });
 
@@ -190,51 +191,48 @@ describe('circular references between custom types', () => {
         alice.friends.push(carol);
 
         tester.serializeDeserialize({ input: alice }, {
+            input: {
+                id: 1,
+                name: 'Alice',
+                friends: [ {
+                    id: 2,
+                    name: 'Bob',
+                    friends: [ 1 ],
+                    createdAt: '2020-02-02T00:00:00.000Z',
+                    $: { friends: { 1: 'ref' }, createdAt: 'Date' },
+                }, {
+                    createdAt: '2020-03-03T00:00:00.000Z',
+                    friends: [],
+                    id: 3,
+                    name: 'Carol',
+                    $: { createdAt: 'Date' },
+                } ],
+                createdAt: '2020-01-01T00:00:00.000Z',
+                $: { friends: { 1: 'User', 2: 'User' }, createdAt: 'Date' },
+
+            },
             $: { input: 'User' },
-            input: {
-                $: { friends: { 1: 'User', 2: 'User' }, createdAt: 'Date' },
-                id: 1,
-                name: 'Alice',
-                friends: [ {
-                    $: { friends: { 1: 'ref' }, createdAt: 'Date' },
-                    id: 2,
-                    name: 'Bob',
-                    friends: [ 1 ],
-                    createdAt: '2020-02-02T00:00:00.000Z',
-                }, {
-                    $: {
-                        createdAt: 'Date',
-                    },
-                    createdAt: '2020-03-03T00:00:00.000Z',
-                    friends: [],
-                    id: 3,
-                    name: 'Carol',
-                } ],
-                createdAt: '2020-01-01T00:00:00.000Z',
-            },
         }, {
-            $: { input: [ 'User', 1 ] },
             input: {
-                $: { friends: { 1: 'User', 2: 'User' }, createdAt: 'Date' },
                 id: 1,
                 name: 'Alice',
                 friends: [ {
-                    $: { friends: { 1: 'ref' }, createdAt: 'Date' },
                     id: 2,
                     name: 'Bob',
                     friends: [ 1 ],
                     createdAt: '2020-02-02T00:00:00.000Z',
+                    $: { friends: { 1: 'ref' }, createdAt: 'Date' },
                 }, {
-                    $: {
-                        createdAt: 'Date',
-                    },
                     createdAt: '2020-03-03T00:00:00.000Z',
                     friends: [],
                     id: 3,
                     name: 'Carol',
+                    $: { createdAt: 'Date' },
                 } ],
                 createdAt: '2020-01-01T00:00:00.000Z',
+                $: { friends: { 1: 'User', 2: 'User' }, createdAt: 'Date' },
             },
+            $: { input: [ 'User', 1 ] },
         });
     });
 });
@@ -305,56 +303,56 @@ test('recursively nested classes', () => {
 
     // We skip the first deserialization test because it would be literally the same thing except for the one reference (which is not the focus here).
     tester.serializeDeserialize({ input }, {
-        $: {
-            input: 'Comment',
-        },
         input: {
-            $: {
-                author: 'Author',
-                createdAt: 'Date',
-                responses: { 1: 'Comment', 2: 'Comment' },
-            },
             author: {
                 name: 'Alice',
             },
             content: 'Root comment',
             createdAt: '2001-01-01T00:00:00.000Z',
             responses: [ {
-                $: {
-                    author: 'Author',
-                    createdAt: 'Date',
-                },
                 author: {
                     name: 'Eve',
                 },
                 content: 'First reply',
                 createdAt: '2002-02-02T00:00:00.000Z',
                 responses: [],
-            }, {
                 $: {
                     author: 'Author',
                     createdAt: 'Date',
-                    responses: { 1: 'Comment' },
                 },
+            }, {
                 author: {
                     name: 'Bob',
                 },
                 content: 'Second reply',
                 createdAt: '2003-03-03T00:00:00.000Z',
                 responses: [ {
-                    $: {
-                        author: 'Author',
-                        createdAt: 'Date',
-                        responses: 'undefined',
-                    },
                     author: {
                         name: 'Charlie',
                     },
                     content: 'Nested reply',
                     createdAt: '2004-04-04T00:00:00.000Z',
                     responses: null,
+                    $: {
+                        author: 'Author',
+                        createdAt: 'Date',
+                        responses: 'undefined',
+                    },
                 } ],
+                $: {
+                    author: 'Author',
+                    createdAt: 'Date',
+                    responses: { 1: 'Comment' },
+                },
             } ],
+            $: {
+                author: 'Author',
+                createdAt: 'Date',
+                responses: { 1: 'Comment', 2: 'Comment' },
+            },
+        },
+        $: {
+            input: 'Comment',
         },
     });
 });
@@ -424,8 +422,8 @@ describe('complex inheritance', () => {
 
         tester.serialize({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: 'A' },
                 input: { id: 7 },
+                $: { input: 'A' },
             });
             expect(serialized).toStrictEqual(expected);
         });
@@ -444,12 +442,12 @@ describe('complex inheritance', () => {
 
         tester.serialize({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: 'C' },
                 input: {
                     id: 42,
                     label: 'nearest',
                     isActive: false,
                 },
+                $: { input: 'C' },
             });
             expect(serialized).toStrictEqual(expected);
         });

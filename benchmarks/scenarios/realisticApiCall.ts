@@ -9,8 +9,6 @@ export function realisticApiCallScenario(): Scenario {
         iterations: 100,
         batches: 5,
         getData: createRealisticApiCalls,
-        // Too slow.
-        skipSerializers: [ 'next-json' ],
     };
 }
 

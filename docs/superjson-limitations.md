@@ -48,10 +48,10 @@ This makes large objects hard to read, because we have to navigate long paths in
 ```ts
 {
     a: {
+        b: 'NaN',
         $: {
             b: 'number',
         },
-        b: 'NaN',
     },
 }
 ```

@@ -159,7 +159,7 @@ function processObject(value: JsonObject): SortingResult {
     if (result !== undefined)
         return result;
 
-    // Let's get hte min and max values here, where even the escaped property is included.
+    // Let's get the min and max values here, where even the escaped property is included.
     let minId = EMPTY_SET_MIN;
     let maxRef = EMPTY_SET_MAX;
 

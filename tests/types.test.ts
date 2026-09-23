@@ -20,8 +20,8 @@ describe('primitive types', () => {
 
     test('undefined', () => {
         tester.serializeDeserialize({ input: undefined }, {
-            $: { input: 'undefined' },
             input: null,
+            $: { input: 'undefined' },
         });
         tester.serializeDeserialize(undefined, wrap(null, 'undefined'));
     });
@@ -33,8 +33,8 @@ describe('primitive types', () => {
         [ -0, '-0' ],
     ])('number %p to "%s"', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'number' },
             input: expected,
+            $: { input: 'number' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'number'));
     });
@@ -46,8 +46,8 @@ describe('primitive types', () => {
         [ BigInt(Number.MAX_SAFE_INTEGER) + 2n, String(BigInt(Number.MAX_SAFE_INTEGER) + 2n) ],
     ])('bigint %p to "%s"', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'bigint' },
             input: expected,
+            $: { input: 'bigint' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'bigint'));
     });
@@ -65,8 +65,8 @@ describe('primitive types', () => {
         [ symbolB, 'bId' ],
     ])('symbol %p', (input, expected) => {
         symbolTester.serializeDeserialize({ input }, {
-            $: { input: 'symbol' },
             input: expected,
+            $: { input: 'symbol' },
         });
         symbolTester.serializeDeserialize(input, wrap(expected, 'symbol'));
     });
@@ -125,8 +125,8 @@ describe('containers', () => {
         { input: { 4: 'undefined' } },
     ] ])('array %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
         tester.serializeDeserialize({ input }, {
-            $: annotations,
             input: expected,
+            $: annotations,
         });
     });
 
@@ -136,8 +136,8 @@ describe('containers', () => {
 
         tester.serialize({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: { 2: 'undefined' } },
                 input: [ 1, null, 3 ],
+                $: { input: { 2: 'undefined' } },
             });
             expect(serialized).toStrictEqual(expected);
         });
@@ -163,8 +163,8 @@ describe('containers', () => {
         [ [ [ 1 ], [ 2 ] ] ],
     ])('set %p', (input: JsonArray) => {
         tester.serializeDeserialize({ input: new Set(input) }, {
-            $: { input: { 0: 'Set' } },
             input,
+            $: { input: { 0: 'Set' } },
         });
         tester.serializeDeserialize(new Set(input), wrap(input, { 0: 'Set' }));
     });
@@ -179,8 +179,8 @@ describe('containers', () => {
         { input: { 0: 'Set', 4: 'undefined' } },
     ] ])('set %p to %p', (input: unknown[], expected: JsonArray, annotations: Annotations) => {
         tester.serializeDeserialize({ input: new Set(input) }, {
-            $: annotations,
             input: expected,
+            $: annotations,
         });
     });
 
@@ -191,8 +191,8 @@ describe('containers', () => {
         [ [ [ [], {} ], [ {}, [] ] ] ],
     ])('map %p', input => {
         tester.serializeDeserialize({ input: new Map(input) }, {
-            $: { input: { 0: 'Map' } },
             input,
+            $: { input: { 0: 'Map' } },
         });
         tester.serializeDeserialize(new Map(input), wrap(input, { 0: 'Map' }));
     });
@@ -216,8 +216,8 @@ describe('containers', () => {
         //     { input: { 0: 'Map', 2: 'RegExp', 5: 'RegExp' } },
     ] ])('map %p to %p', (input, expected, annotations) => {
         tester.serializeDeserialize({ input: new Map(input) }, {
-            $: annotations,
             input: expected,
+            $: annotations,
         });
     });
 
@@ -236,18 +236,18 @@ describe('containers', () => {
 
 describe('special objects', () => {
     test.each([
-        [ { $: NaN }, { $: { $$: 'number' }, $$: 'NaN' } ],
-        [ { $: [ NaN ] }, { $: { $$: { 1: 'number' } }, $$: [ 'NaN' ] } ],
+        [ { $: NaN }, { $$: 'NaN', $: { $$: 'number' } } ],
+        [ { $: [ NaN ] }, { $$: [ 'NaN' ], $: { $$: { 1: 'number' } } } ],
     ])('object with escape key %p', (input, expected) => {
         tester.serializeDeserialize({ input }, { input: expected });
         tester.serializeDeserialize(input, expected);
     });
 
-    test('annotation is the first key', () => {
+    test('annotation is the last key', () => {
         const input = { a: 1, b: NaN };
 
         tester.serialize(input, serialized => {
-            expect(Object.keys(serialized)).toStrictEqual([ '$', 'a', 'b' ]);
+            expect(Object.keys(serialized)).toStrictEqual([ 'a', 'b', '$' ]);
         });
     });
 
@@ -309,7 +309,7 @@ describe('special objects', () => {
     test.each(forbiddenObjectKeys)('deserialization rejects forbidden key %s', forbiddenKey => {
         tester.forEach(serializer => {
             const version = serializer.config.version;
-            const inputJson = `{ "$": { "$": ${version} }, "${forbiddenKey}": 1 }`;
+            const inputJson = `{ "${forbiddenKey}": 1, "$": { "$": ${version} } }`;
 
             expect(() => serializer.parse(inputJson)).toThrowError(new RegExp(forbiddenKey));
             expect((Object.prototype as Record<string, unknown>).value).toBeUndefined();
@@ -328,8 +328,8 @@ describe('typed arrays', () => {
         [ new Uint8Array(new Uint8Array([ 1, 1, 0, 1 ]).buffer, 2, 1), 'AA==' ], // same as [ 0 ]
     ])('Uint8Array %p to %s', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'Uint8Array' },
             input: expected,
+            $: { input: 'Uint8Array' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'Uint8Array'));
     });
@@ -346,8 +346,8 @@ describe('typed arrays', () => {
         [ new Float64Array([ Number.MAX_SAFE_INTEGER * 2 ]), '________T0M=' ],
     ])('Float64Array %p to %s', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'Float64Array' },
             input: expected,
+            $: { input: 'Float64Array' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'Float64Array'));
     });
@@ -363,8 +363,8 @@ describe('predefined types', () => {
         // [ new Date(NaN), null ],
     ])('Date %p to %p', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'Date' },
             input: expected,
+            $: { input: 'Date' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'Date'));
     });
@@ -372,8 +372,8 @@ describe('predefined types', () => {
     test('Invalid date', () => {
         tester.serialize({ input: new Date(NaN) }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: 'Date' },
                 input: null,
+                $: { input: 'Date' },
             });
             expect(serialized).toStrictEqual(expected);
         });
@@ -386,8 +386,8 @@ describe('predefined types', () => {
         [ /a.*([^{]){0,4}/, '/a.*([^{]){0,4}/' ],
     ])('RegExp %p to %p', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'RegExp' },
             input: expected,
+            $: { input: 'RegExp' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'RegExp'));
     });
@@ -397,8 +397,8 @@ describe('predefined types', () => {
         [ new URL('https://example.com/abc%20efg?param=value&next=true#fragment'), 'https://example.com/abc%20efg?param=value&next=true#fragment' ],
     ])('URL %o to %p', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'URL' },
             input: expected,
+            $: { input: 'URL' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'URL'));
     });

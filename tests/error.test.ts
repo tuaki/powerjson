@@ -26,22 +26,22 @@ describe('basic Error serialization', () => {
         [
             new Error('error D', { cause: new Error('error E') }),
             {
-                $: { cause: 'Error' },
                 name: 'Error',
                 message: 'error D',
                 cause: {
                     name: 'Error',
                     message: 'error E',
                 },
+                $: { cause: 'Error' },
             },
         ],
         [
             new Error('error B', { cause: undefined }),
             {
-                $: { cause: 'undefined' },
                 name: 'Error',
                 message: 'error B',
                 cause: null,
+                $: { cause: 'undefined' },
             },
         ],
         [
@@ -74,8 +74,8 @@ describe('basic Error serialization', () => {
         ],
     ])('Error %o to %p', (input, expected) => {
         tester.serializeDeserialize({ input }, {
-            $: { input: 'Error' },
             input: expected,
+            $: { input: 'Error' },
         });
     });
 });
@@ -95,11 +95,11 @@ describe('native error subtypes', () => {
         const input = new constructor(`an ${name}`);
 
         const outputs = tester.serializeDeserialize({ input }, {
-            $: { input: 'Error' },
             input: {
                 name,
                 message: `an ${name}`,
             },
+            $: { input: 'Error' },
         });
 
         for (const { input: output } of outputs)
@@ -122,11 +122,11 @@ describe('unrecognized error names', () => {
 
         tester.serialize({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: 'Error' },
                 input: {
                     name: 'Error',
                     message: 'custom message',
                 },
+                $: { input: 'Error' },
             });
             expect(serialized).toStrictEqual(expected);
 
@@ -148,12 +148,12 @@ describe('message edge cases', () => {
         expect(input.message).toBe('');
 
         tester.serializeDeserialize({ input }, {
-            $: { input: 'Error' },
             input: {
-                $: { message: 'undefined' },
                 name: 'Error',
                 message: null,
+                $: { message: 'undefined' },
             },
+            $: { input: 'Error' },
         });
     });
 
@@ -164,12 +164,12 @@ describe('message edge cases', () => {
 
         tester.serialize({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: 'Error' },
                 input: {
-                    $: { message: 'undefined' },
                     name: 'Error',
                     message: null,
+                    $: { message: 'undefined' },
                 },
+                $: { input: 'Error' },
             });
             expect(serialized).toStrictEqual(expected);
 
@@ -185,11 +185,11 @@ describe('message edge cases', () => {
 
         tester.serialize({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: 'Error' },
                 input: {
                     name: 'Error',
                     message: '42',
                 },
+                $: { input: 'Error' },
             });
             expect(serialized).toStrictEqual(expected);
 
@@ -205,11 +205,11 @@ describe('message edge cases', () => {
 
         tester.serialize({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
-                $: { input: 'Error' },
                 input: {
                     name: 'Error',
                     message: 'weird!',
                 },
+                $: { input: 'Error' },
             });
             expect(serialized).toStrictEqual(expected);
 
@@ -227,11 +227,11 @@ describe('stack', () => {
         input.stack = 'Error: has a stack\n    at somewhere';
 
         const outputs = tester.serializeDeserialize({ input }, {
-            $: { input: 'Error' },
             input: {
                 name: 'Error',
                 message: 'has a stack',
             },
+            $: { input: 'Error' },
         });
 
         for (const { input: output } of outputs)
@@ -250,12 +250,12 @@ describe('stack', () => {
         input.stack = 'Error: has a stack\n    at somewhere';
 
         stackTester.serializeDeserialize({ input }, {
-            $: { input: 'Error' },
             input: {
                 name: 'Error',
                 message: 'has a stack',
                 stack: input.stack as string,
             },
+            $: { input: 'Error' },
         });
     });
 });
@@ -268,11 +268,11 @@ describe('custom properties', () => {
         Object.defineProperty(input, 'hidden', { value: 'nope', enumerable: false, configurable: true, writable: true });
 
         const outputs = tester.serializeDeserialize({ input }, {
-            $: { input: 'Error' },
             input: {
                 name: 'Error',
                 message: 'has hidden extra',
             },
+            $: { input: 'Error' },
         });
 
         for (const { input: output } of outputs)
@@ -284,12 +284,12 @@ describe('custom properties', () => {
         Object.defineProperty(input, 'computed', { get: () => 99, enumerable: true, configurable: true });
 
         const outputs = tester.serializeDeserialize({ input }, {
-            $: { input: 'Error' },
             input: {
                 name: 'Error',
                 message: 'has computed extra',
                 computed: 99,
             },
+            $: { input: 'Error' },
         });
 
         for (const { input: output } of outputs)
@@ -308,31 +308,31 @@ describe('circular references', () => {
         Object.defineProperty(errorA, 'cause', { value: errorB, writable: true, enumerable: false, configurable: true });
 
         const outputs = tester.serializeDeserialize({ input: errorA }, {
+            input: {
+                name: 'Error',
+                message: 'error A',
+                cause: {
+                    name: 'Error',
+                    message: 'error B',
+                    cause: 1,
+                    $: { cause: 'ref' },
+                },
+                $: { cause: 'Error' },
+            },
             $: { input: 'Error' },
-            input: {
-                $: { cause: 'Error' },
-                name: 'Error',
-                message: 'error A',
-                cause: {
-                    $: { cause: 'ref' },
-                    name: 'Error',
-                    message: 'error B',
-                    cause: 1,
-                },
-            },
         }, {
-            $: { input: [ 'Error', 1 ] },
             input: {
-                $: { cause: 'Error' },
                 name: 'Error',
                 message: 'error A',
                 cause: {
-                    $: { cause: 'ref' },
                     name: 'Error',
                     message: 'error B',
                     cause: 1,
+                    $: { cause: 'ref' },
                 },
+                $: { cause: 'Error' },
             },
+            $: { input: [ 'Error', 1 ] },
         });
 
         // The cause chain must be an actual cycle, not merely two structurally-equal errors.
@@ -347,21 +347,21 @@ describe('circular references', () => {
         input.self = input;
 
         const outputs = tester.serializeDeserialize({ input }, {
+            input: {
+                name: 'Error',
+                message: 'self ref',
+                self: 1,
+                $: { self: 'ref' },
+            },
             $: { input: 'Error' },
-            input: {
-                $: { self: 'ref' },
-                name: 'Error',
-                message: 'self ref',
-                self: 1,
-            },
         }, {
-            $: { input: [ 'Error', 1 ] },
             input: {
-                $: { self: 'ref' },
                 name: 'Error',
                 message: 'self ref',
                 self: 1,
+                $: { self: 'ref' },
             },
+            $: { input: [ 'Error', 1 ] },
         });
 
         for (const { input: output } of outputs) {

@@ -30,19 +30,19 @@ const data = {
 const jsonString = PowerJson.stringify(data, 4);
 /*
 {
-    "$": {
-        "$": 1,
-        "a": "number",
-        "b": "Date",
-        "c": {
-            "0": "Set"
-        }
-    },
     "a": "NaN",
     "b": "1970-01-01T00:00:00.000Z",
     "c": [
         "key"
-    ]
+    ],
+    "$": {
+        "a": "number",
+        "b": "Date",
+        "c": {
+            "0": "Set"
+        },
+        "$": 1
+    }
 }
 */
 
