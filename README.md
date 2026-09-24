@@ -107,7 +107,7 @@ Any object with an unsupported type will be serialized as a plain JS object. You
 import { PowerJson, transformer } from 'powerjson';
 
 const dateTimeTransformer = transformer({
-    clazz: DateTime,
+    cls: DateTime,
     type: 'DateTime',
     serialize: value => value.toISO()!,
     deserialize: value => DateTime.fromISO(value, { setZone: true }),

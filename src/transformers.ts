@@ -48,7 +48,7 @@ export type Primitive = undefined | null | string | number | boolean | bigint | 
 export type ObjectLike = object;
 
 export type Transformer<TObject extends ObjectLike = ObjectLike, TJson extends JsonValue = JsonValue> = {
-    clazz: Clazz<TObject>;
+    cls: Class<TObject>;
     type: TypeId | undefined;
     /**
      * Serializes the value to a JSON value.
@@ -70,7 +70,7 @@ export type Transformer<TObject extends ObjectLike = ObjectLike, TJson extends J
     isComposite: boolean;
 };
 
-type Clazz<T> = {
+type Class<T> = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- This is needed for `new` operator. Nothing else really works.
     new (...args: any[]): T;
 } | {
@@ -84,7 +84,7 @@ type Clazz<T> = {
  * Automatically infers the types of `TObject` and `TJson` from the provided functions.
  */
 export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(options: {
-    clazz: Clazz<TObject>;
+    cls: Class<TObject>;
     type: TypeId | undefined;
     serialize: (value: TObject, serializer: Serializer) => TJson | undefined;
     deserialize: (value: TJson, deserializer: Deserializer) => TObject;
@@ -107,7 +107,7 @@ export function transformer<TObject extends ObjectLike, TJson extends JsonValue>
 // #region Containers
 
 const plainObjectTransformer = transformer({
-    clazz: Object as unknown as Clazz<PlainObject>,
+    cls: Object as unknown as Class<PlainObject>,
     type: undefined,
     serialize: (value, serializer) => serializer.serializePlainObject(value),
     deserialize: (value, deserializer) => deserializer.deserializePlainObject(value),
@@ -134,7 +134,7 @@ export function isPlainObject(value: unknown): value is PlainObject {
 }
 
 const arrayTransformer = transformer({
-    clazz: Array,
+    cls: Array,
     type: undefined,
     serialize: (value, serializer) => serializer.serializeArray(value),
     deserialize: (value, deserializer) => deserializer.deserializeArray(value),
@@ -143,7 +143,7 @@ const arrayTransformer = transformer({
 });
 
 const setTransformer = transformer({
-    clazz: Set,
+    cls: Set,
     type: 'Set',
     serialize: (value, serializer) => serializer.serializeSet(value),
     deserialize: (value, deserializer) => deserializer.deserializeSet(value),
@@ -152,7 +152,7 @@ const setTransformer = transformer({
 });
 
 const mapTransformer = transformer({
-    clazz: Map,
+    cls: Map,
     type: 'Map',
     serialize: (value, serializer) => serializer.serializeMap(value),
     deserialize: (value, deserializer) => deserializer.deserializeMap(value),
@@ -164,7 +164,7 @@ const mapTransformer = transformer({
 // #region Predefined types
 
 const dateTransformer = transformer({
-    clazz: Date,
+    cls: Date,
     type: 'Date',
     serialize: value => {
         // Date can be invalid; let's serialize it as null.
@@ -178,7 +178,7 @@ const dateTransformer = transformer({
 // TODO Add support for Temporal
 
 const regexpTransformer = transformer({
-    clazz: RegExp,
+    cls: RegExp,
     type: 'RegExp',
     serialize: value => {
         // Returns a string in the form of `/pattern/flags`.
@@ -192,7 +192,7 @@ const regexpTransformer = transformer({
 });
 
 const urlTransformer = transformer({
-    clazz: URL,
+    cls: URL,
     type: 'URL',
     serialize: value => {
         return value.toString();
@@ -214,7 +214,7 @@ const urlTransformer = transformer({
 // [SupressedError](https://tc39.es/ecma262/#sec-suppressederror-objects) is not yet in the current standard (ES2026).
 
 const errorTransformer = transformer({
-    clazz: Error,
+    cls: Error,
     type: 'Error',
     serialize: (value, serializer) => {
         // The default `Error` properties aren't enumerable. So, we need to explicitly copy them to a plain object.
@@ -324,9 +324,9 @@ type TypedArray = InstanceType<typeof typedArrayConstructors[number]>;
 
 const BASE64_ALPHABET = 'base64url';
 
-export const typedArrayTransformers = typedArrayConstructors.map(clazz => transformer({
-    clazz,
-    type: clazz.name,
+export const typedArrayTransformers = typedArrayConstructors.map(cls => transformer({
+    cls,
+    type: cls.name,
     serialize: (value: TypedArray) => {
         // Only Uint8Array has a built-in base64 methods.
         //
@@ -338,7 +338,7 @@ export const typedArrayTransformers = typedArrayConstructors.map(clazz => transf
     deserialize: value => {
         const bytes = Uint8Array.fromBase64(value, { alphabet: BASE64_ALPHABET });
         // Gotcha! The typed arrays expose `byteLength` in bytes, but their constructors expect the length in elements.
-        return new clazz(bytes.buffer, bytes.byteOffset, bytes.byteLength / clazz.BYTES_PER_ELEMENT);
+        return new cls(bytes.buffer, bytes.byteOffset, bytes.byteLength / cls.BYTES_PER_ELEMENT);
     },
 }));
 

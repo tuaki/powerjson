@@ -35,7 +35,7 @@ test('ignores private properties', () => {
 });
 
 const dateTimeTransformer = transformer({
-    clazz: DateTime,
+    cls: DateTime,
     type: 'DateTime',
     serialize: value => value.toISO()!,
     deserialize: value => DateTime.fromISO(value, { setZone: true }),
@@ -66,7 +66,7 @@ class SimpleDateTime {
 }
 
 const simpleDateTimeTransformer = transformer({
-    clazz: SimpleDateTime,
+    cls: SimpleDateTime,
     // Let's try a different name.
     type: 'SDT',
     serialize: value => value.iso,
@@ -95,7 +95,7 @@ class Point {
 }
 
 const pointTransformer = transformer({
-    clazz: Point,
+    cls: Point,
     type: 'Point',
     // This should test that we can leverage the build-in functions to correctly handle composite indexes.
     serialize: (value, serializer) => serializer.serializeArray([
@@ -138,7 +138,7 @@ class User {
 
 
 const userTransformer = transformer({
-    clazz: User,
+    cls: User,
     type: 'User',
     // This is kinda complex, so we use the built-in object functions.
     // We could copy the object like this:
@@ -244,7 +244,7 @@ class Author {
 }
 
 const authorTransformer = transformer({
-    clazz: Author,
+    cls: Author,
     type: 'Author',
     // Let's try direct serialization.
     // This is generally not recommended because it can lead to issues on so many levels.
@@ -267,7 +267,7 @@ class Comment {
 }
 
 const commentTransformer = transformer({
-    clazz: Comment,
+    cls: Comment,
     type: 'Comment',
     serialize: (value, serializer) => serializer.serializePlainObject(value),
     // This works but breaks references and creates an additional throwaway object. But if we don't use references (and need, for example, to run the constructor with full parameters), this is also a good choice.
@@ -364,7 +364,7 @@ abstract class A {
 }
 
 const aTransformer = transformer({
-    clazz: A,
+    cls: A,
     type: 'A',
     serialize: value => ({ id: value.id }),
     deserialize: value => value as unknown as A,
@@ -390,7 +390,7 @@ class C extends B {
 }
 
 const cTransformer = transformer({
-    clazz: C,
+    cls: C,
     type: 'C',
     serialize: value => ({
         id: value.id,

@@ -82,7 +82,7 @@ export class PowerJsonConfig {
     private readonly transformersByType: Map<string, Transformer> = new Map();
 
     private registerTransformer(transformer: Transformer): void {
-        const prototype = transformer.clazz.prototype;
+        const prototype = transformer.cls.prototype;
         this.transformersByPrototype.set(prototype, transformer);
 
         if (transformer.type !== undefined)

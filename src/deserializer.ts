@@ -181,7 +181,8 @@ export abstract class Deserializer {
 
         if (typeof value !== 'object' || value === null)
             return value;
-        if (Array.isArray(value))
+
+        if (isArray)
             return this.deserializeArray(value);
 
         return this.deserializePlainObject(value);
