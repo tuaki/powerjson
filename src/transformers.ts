@@ -117,8 +117,23 @@ const plainObjectTransformer = transformer({
 /**
  * We should check object keys whenever we directly write to them like `object[key] = ...`.
  * see https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/Prototype_pollution
+ *
+ * This is strictly speaking not needed during serialization, but we don't want to accicentaly create a json that we won't be able to deserialize. So, we check it during serialization as well.
  */
-export function validateObjectKey(key: string) {
+export function validateObjectKeyForPrototypePollution(key: string) {
+    // In theory, this should not be needed - the patterns for PP are:
+    // - `object['__proto__'][x] = ...`
+    // - `object['constructor']['prototype'][x] = ...`
+    // Our algorithms never do that - we always create the intermediate objects/values which we assing like `object[key] = ...`.
+    // However, allowing these keys is still potentially harmful because they might produce objects like `{ constructor: { prototype: { x: ... } } }` which can later, when merged by a naive algorithm, cause PP.
+    // So, there is no good reason to allow these keys.
+    // Like we probably could allow `prototype` since there should be no way how to reach `Object.prototype` without the first two keys, but better safe than sorry.
+    // E.g.,
+    // ```ts
+    // function Foo() {}
+    // const object = { Foo };
+    // ```
+    // gives us `object['Foo']['prototype']`, which is the prototype of all objects created with `new Foo()`, allowing us to alter all of them. So no, thank you.
     if (key === '__proto__' || key === 'constructor' || key === 'prototype')
         throw new Error(`Invalid object key: ${key}. Remove it to avoid prototype pollution.`);
 }
@@ -245,6 +260,7 @@ const errorTransformer = transformer({
         const keysLength = keys.length;
         for (let i = 0; i < keysLength; i++) {
             const key = keys[i];
+            // No need to validate for prototype pollution here because we will do that in `serializePlainObject` anyway.
             if (key === 'name' || key === 'message' || key === 'stack' || key === 'cause')
                 continue;
 

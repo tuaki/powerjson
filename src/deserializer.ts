@@ -1,5 +1,5 @@
 import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AlgorithmVersion, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type RootJsonObject, type TypeId } from './json.ts';
-import { deserializeNumber, validateObjectKey, type ObjectLike, type PlainObject, type Primitive } from './transformers.ts';
+import { deserializeNumber, validateObjectKeyForPrototypePollution, type ObjectLike, type PlainObject, type Primitive } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
 export function getAlgorithmVersion(root: RootJsonObject): AlgorithmVersion {
@@ -82,7 +82,7 @@ export abstract class Deserializer {
             let key = keys[i];
             const item = value[key];
 
-            validateObjectKey(key);
+            validateObjectKeyForPrototypePollution(key);
 
             if (key[0] === ESCAPE_CHAR) {
                 if (key === ESCAPE_CHAR)

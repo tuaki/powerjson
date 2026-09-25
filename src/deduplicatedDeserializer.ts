@@ -1,7 +1,7 @@
 import type { SortObjectKeysOption } from './config.ts';
 import { Deserializer } from './deserializer.ts';
 import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey, type RootJsonObject } from './json.ts';
-import { validateObjectKey, type ObjectLike } from './transformers.ts';
+import { validateObjectKeyForPrototypePollution, type ObjectLike } from './transformers.ts';
 
 export class DeduplicatedDeserializer extends Deserializer {
     private sortObjectKeys!: SortObjectKeysOption;
@@ -136,7 +136,7 @@ function processObject(value: JsonObject): SortingResult {
         let key = keys[i];
         const item = value[key];
 
-        validateObjectKey(key);
+        validateObjectKeyForPrototypePollution(key);
 
         if (key[0] === ESCAPE_CHAR) {
             if (key === ESCAPE_CHAR)
@@ -317,6 +317,8 @@ function sortObjectKeys(value: JsonObject, annotations: Annotations | undefined,
         if (key === ESCAPE_CHAR)
             continue;
 
+        validateObjectKeyForPrototypePollution(key);
+
         // Only references and non-primitives were included in the childResults.
         if (annotations?.[key] === REFERENCE_ANNOTATION || typeof item === 'object' && item !== null) {
             childResults[i].key = key;
@@ -338,6 +340,7 @@ function sortObjectKeys(value: JsonObject, annotations: Annotations | undefined,
     for (let i = 0; i < resultsLength; i++) {
         const childResult = childResults[i];
         // All keys have to be defined at this point.
+        // Also, no need to validate it for prototype pollution since we've already done it above.
         const key = childResult.key!;
         sortedEntity[key] = childResult.sortedEntity ?? value[key];
     }

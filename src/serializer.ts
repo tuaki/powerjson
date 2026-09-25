@@ -1,5 +1,5 @@
 import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
-import { isPlainObject, serializeNumber, validateObjectKey, type ObjectLike, type PlainObject } from './transformers.ts';
+import { isPlainObject, serializeNumber, validateObjectKeyForPrototypePollution, type ObjectLike, type PlainObject } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
 export abstract class Serializer {
@@ -102,7 +102,7 @@ export abstract class Serializer {
             let key = keys[i];
             const item = value[key];
 
-            validateObjectKey(key);
+            validateObjectKeyForPrototypePollution(key);
 
             // No need to check for symbol keys here since `Object.keys` doesn't return them.
 
@@ -110,7 +110,6 @@ export abstract class Serializer {
                 key = escapeKey(key);
 
             this.key = key;
-
             this.compositeIndex = undefined;
 
             const serializedItem = this.serializeUnknown(item);
