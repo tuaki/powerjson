@@ -55,11 +55,21 @@ This has also some performance implications. When deserializing references in th
 
 First, all values are passed through `switch (typeof value)`. This let's PowerJson immediately handle all primitive types. Only if the value is a non-null object, it looks up the serialization function in a `Map` of object prototypes. This means:
 
-- A `while` loop is used to traverse the prototype chain, so classes that extend other classes are handled correctly. If you want to serialize deeply nested class hieararchies without this traversal, you have can explicitly register the classes for faster lookup.
+- A `while` loop is used to traverse the prototype chain, so classes that extend other classes are handled correctly. If you want to serialize deeply nested class hieararchies without this traversal, you can explicitly register the classes for faster lookup.
 - This should behave the same as `instanceof` operator, except for the [`Symbol.hasInstance`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/hasInstance) customization. If you know of a valid use case for this feature, please let us know (because we don't know of any).
 - Different realms (e.g., iframes, web workers) have different prototypes (i.e., the `Date` constructor in one realm is not equal to the `Date` constructor in another realm). Therefore, serialization of objects from different realms will not work unless you explicitly register the classes from those realms.
 
 *SuperJSON uses a linear search with `isApplicable` function for both primitive and object types, which is much slower.*
+
+### Unknown object types & `toJSON`
+
+The prototype chain traversal eventually ends with either `Object.prototype` (or `null`), pointing to the `plainObjectTransformer`, or an `Array.prototype`, pointing to the `arrayTransformer`, so each object can be serialized. You can override them by registering a custom transformer for the `Object` or `Array` class.
+
+*If SuperJSON doesn't find any applicable transformer for a non-plain object, it just passes the whole object to `JSON.stringify` without any further traversal.*
+
+The behavior of SuperJSON does make sense in a specific use case: if the object has a `toJSON` method, it will be called by `JSON.stringify`, and the result will be serialized. To support this use case, PowerJson checks eligible objects for the `toJSON` method. If it exists, it is called and the result is serialized instead of the original object (if the result also contains a `toJSON` method, it won't be called again, exactly as `JSON.stringify` would behave).
+
+However, only transformers with `useToJSON: true` will be checked for `toJSON`. By default, both `Object` and `Array` transformers have this option enabled, so this behavior extends to all objects without a registered transformer.
 
 ## Annotations
 

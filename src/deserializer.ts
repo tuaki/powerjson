@@ -1,9 +1,9 @@
-import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AlgorithmVersion, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type RootJsonObject, type TypeId } from './json.ts';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, unescapeKey, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AlgorithmVersion, type Annotation, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonObject, type JsonValue, type SerializedValue, type TypeId } from './json.ts';
 import { deserializeNumber, validateObjectKeyForPrototypePollution, type ObjectLike, type PlainObject, type Primitive } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
-export function getAlgorithmVersion(root: RootJsonObject): AlgorithmVersion {
-    return root[ESCAPE_CHAR][ESCAPE_CHAR];
+export function getAlgorithmVersion(jsonObject: SerializedValue): AlgorithmVersion {
+    return jsonObject[ESCAPE_CHAR][ESCAPE_CHAR];
 }
 
 export abstract class Deserializer {
@@ -13,14 +13,24 @@ export abstract class Deserializer {
         this.config = config;
     }
 
-    deserialize(root: RootJsonObject): unknown {
-        const annotations = root[ESCAPE_CHAR];
-        const isWrapped = annotations[WRAPPED_DIRECTIVE] === true && root[WRAPPED_DIRECTIVE] === undefined;
+    deserialize(jsonObject: SerializedValue): unknown {
+        let serialized: JsonValue;
 
-        const output = this.deserializePlainObject(root);
+        const annotations = jsonObject[ESCAPE_CHAR];
+        // There is only one way for a non-escape key to be in annotations and not in the object - if the object is wrapped.
+        const isWrapped = annotations[WRAPPED_DIRECTIVE] === true && !(WRAPPED_DIRECTIVE in jsonObject);
+        if (isWrapped) {
+            this.annotation = annotations[WRAPPED_KEY];
+            serialized = jsonObject[WRAPPED_KEY];
+        }
+        else {
+            serialized = jsonObject;
+        }
 
-        return isWrapped ? output[WRAPPED_KEY] : output;
+        return this.deserializeUnwrapped(serialized);
     }
+
+    protected abstract deserializeUnwrapped(serialized: JsonValue): unknown;
 
     // #region Context
 
@@ -169,7 +179,7 @@ export abstract class Deserializer {
     // #endregion
     // #region Transformers
 
-    private deserializeValue(value: JsonValue): ObjectLike | Primitive {
+    protected deserializeValue(value: JsonValue): ObjectLike | Primitive {
         const isArray = Array.isArray(value);
         if (isArray && this.compositeIndex === undefined)
             this.compositeIndex = 0;

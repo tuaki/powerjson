@@ -120,7 +120,7 @@ describe('unrecognized error names', () => {
     test('a custom subclass with a non-standard name degrades to a plain Error', () => {
         const input = new CustomError('custom message');
 
-        tester.serialize({ input }, (serialized, serializer) => {
+        tester.serializeCallback({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
                 input: {
                     name: 'Error',
@@ -162,7 +162,7 @@ describe('message edge cases', () => {
         Object.defineProperty(input, 'message', { get: () => 'computed', enumerable: false, configurable: true });
         expect(input.message).toBe('computed');
 
-        tester.serialize({ input }, (serialized, serializer) => {
+        tester.serializeCallback({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
                 input: {
                     name: 'Error',
@@ -183,7 +183,7 @@ describe('message edge cases', () => {
         const input = new Error('placeholder');
         Object.defineProperty(input, 'message', { value: 42, enumerable: false, writable: true, configurable: true });
 
-        tester.serialize({ input }, (serialized, serializer) => {
+        tester.serializeCallback({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
                 input: {
                     name: 'Error',
@@ -203,7 +203,7 @@ describe('message edge cases', () => {
         const input = new Error('placeholder');
         Object.defineProperty(input, 'message', { value: weirdMessage, enumerable: false, writable: true, configurable: true });
 
-        tester.serialize({ input }, (serialized, serializer) => {
+        tester.serializeCallback({ input }, (serialized, serializer) => {
             const expected = Tester.addVersionToSerialized(serializer, {
                 input: {
                     name: 'Error',

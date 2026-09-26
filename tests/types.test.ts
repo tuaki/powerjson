@@ -74,10 +74,7 @@ describe('primitive types', () => {
     const symbolC = Symbol('symbolC');
 
     test('unregistered symbol is ignored', () => {
-        symbolTester.serialize({ input: symbolC }, (serialized, serializer) => {
-            const expected = Tester.addVersionToSerialized(serializer, {});
-            expect(serialized).toStrictEqual(expected);
-        });
+        symbolTester.serialize({ input: symbolC }, {});
     });
 
     const symbolD = Symbol();
@@ -134,12 +131,9 @@ describe('containers', () => {
         // eslint-disable-next-line no-sparse-arrays -- This is the very thing we want to test.
         const input = [ 1, , 3 ];
 
-        tester.serialize({ input }, (serialized, serializer) => {
-            const expected = Tester.addVersionToSerialized(serializer, {
-                input: [ 1, null, 3 ],
-                $: { input: { 2: 'undefined' } },
-            });
-            expect(serialized).toStrictEqual(expected);
+        tester.serialize({ input }, {
+            input: [ 1, null, 3 ],
+            $: { input: { 2: 'undefined' } },
         });
     });
 
@@ -246,7 +240,7 @@ describe('special objects', () => {
     test('annotation is the last key', () => {
         const input = { a: 1, b: NaN };
 
-        tester.serialize(input, serialized => {
+        tester.serializeCallback(input, serialized => {
             expect(Object.keys(serialized)).toStrictEqual([ 'a', 'b', '$' ]);
         });
     });
@@ -268,13 +262,10 @@ describe('special objects', () => {
 
         const input: Record<string | symbol, unknown> = { a: 1, [symbol]: 2 };
 
-        tester.serialize({ input }, (serialized, serializer) => {
-            const expected = Tester.addVersionToSerialized(serializer, {
-                input: {
-                    a: 1,
-                },
-            });
-            expect(serialized).toStrictEqual(expected);
+        tester.serialize({ input }, {
+            input: {
+                a: 1,
+            },
         });
     });
 
@@ -285,11 +276,8 @@ describe('special objects', () => {
         input[symbol] = 2;
         input['c'] = 3;
 
-        tester.serialize({ input }, (serialized, serializer) => {
-            const expected = Tester.addVersionToSerialized(serializer, {
-                input: [ 'a' ],
-            });
-            expect(serialized).toStrictEqual(expected);
+        tester.serialize({ input }, {
+            input: [ 'a' ],
         });
     });
 
@@ -370,12 +358,9 @@ describe('predefined types', () => {
     });
 
     test('Invalid date', () => {
-        tester.serialize({ input: new Date(NaN) }, (serialized, serializer) => {
-            const expected = Tester.addVersionToSerialized(serializer, {
-                input: null,
-                $: { input: 'Date' },
-            });
-            expect(serialized).toStrictEqual(expected);
+        tester.serialize({ input: new Date(NaN) }, {
+            input: null,
+            $: { input: 'Date' },
         });
     });
 

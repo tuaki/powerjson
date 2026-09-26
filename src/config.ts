@@ -71,6 +71,10 @@ export class PowerJsonConfig {
             ...transformers,
         ].forEach(transformer => this.registerTransformer(transformer));
 
+        // Register the plain object transformer for `null` as well, so that we can find it when traversing the prototype chain.
+        const plainObjectTransformer = this.transformersByPrototype.get(Object.prototype)!;
+        this.transformersByPrototype.set(null, plainObjectTransformer);
+
         symbols.forEach(symbol => this.registerSymbol(symbol));
     }
 
@@ -78,7 +82,7 @@ export class PowerJsonConfig {
         return this.deduplicate ? 2 : 1;
     }
 
-    private readonly transformersByPrototype: Map<ObjectLike, Transformer> = new Map();
+    private readonly transformersByPrototype: Map<ObjectLike | null, Transformer> = new Map();
     private readonly transformersByType: Map<string, Transformer> = new Map();
 
     private registerTransformer(transformer: Transformer): void {
@@ -105,19 +109,15 @@ export class PowerJsonConfig {
 
     getObjectTransformer(value: ObjectLike): Transformer {
         let prototype = Object.getPrototypeOf(value);
+        let transformer = this.transformersByPrototype.get(prototype);
 
-        while (prototype !== null) {
-            const transformer = this.transformersByPrototype.get(prototype);
-            if (transformer)
-                return transformer;
-
+        while (transformer === undefined) {
             prototype = Object.getPrototypeOf(prototype);
+            transformer = this.transformersByPrototype.get(prototype);
         }
 
-        // The previous search might fail because of `Object.create(null)` shenanigans.
-        // Let's try to support at least the bare minimum of objects and arrays across realms. It ain't much but it's honest work.
-        const defaultPrototype = Array.isArray(value) ? Array.prototype : Object.prototype;
-        return this.transformersByPrototype.get(defaultPrototype)!;
+        // The previous search should never fail because a prototype chain has to end in `null`, and we have a transformer for `null` (the plain object transformer).
+        return transformer;
     }
 
     getTransformerByType(typeId: TypeId): Transformer {

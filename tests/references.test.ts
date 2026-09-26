@@ -154,11 +154,8 @@ describe('circular references', () => {
         z.push(z);
 
         tester.serializeDeserialize(z, wrap(
-            [ 'z', 1 ],
+            [ 'z', 0 ],
             { 2: 'ref' },
-        ), wrap(
-            [ 'z', 1 ],
-            { 0: 1, 2: 'ref' },
         ));
     });
 
@@ -184,11 +181,8 @@ describe('circular references', () => {
         s.add(s);
 
         tester.serializeDeserialize(s, wrap(
-            [ 1 ],
+            [ 0 ],
             { 0: 'Set', 1: 'ref' },
-        ), wrap(
-            [ 1 ],
-            { 0: [ 'Set', 1 ], 1: 'ref' },
         ));
     });
 
@@ -215,14 +209,9 @@ describe('circular references', () => {
 
         tester.serializeDeserialize(m, wrap(
             [
-                [ 1, 1 ],
+                [ 0, 0 ],
             ],
             { 0: 'Map', 2: 'ref', 3: 'ref' },
-        ), wrap(
-            [
-                [ 1, 1 ],
-            ],
-            { 0: [ 'Map', 1 ], 2: 'ref', 3: 'ref' },
         ));
     });
 });
@@ -285,7 +274,6 @@ describe('deduplication', () => {
     const tester = new Tester([
         new PowerJson({ deduplicate: true }),
     ]);
-
 
     test('inserts ids to array without previous annotation', () => {
         const object = { name: 'object' };

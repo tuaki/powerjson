@@ -24,13 +24,10 @@ test('ignores private properties', () => {
 
     // Private properties are not enumerable, so they should be just ignored.
     // The same goes for getters, which are also not enumerable.
-    tester.serialize({ input }, (serialized, serializer) => {
-        const expected = Tester.addVersionToSerialized(serializer, {
-            input: {
-                public: 2,
-            },
-        });
-        expect(serialized).toStrictEqual(expected);
+    tester.serialize({ input }, {
+        input: {
+            public: 2,
+        },
     });
 });
 
@@ -420,12 +417,9 @@ describe('complex inheritance', () => {
     test('prototype lookup falls back to base-class transformer', () => {
         const input = new B(7, 'base');
 
-        tester.serialize({ input }, (serialized, serializer) => {
-            const expected = Tester.addVersionToSerialized(serializer, {
-                input: { id: 7 },
-                $: { input: 'A' },
-            });
-            expect(serialized).toStrictEqual(expected);
+        tester.serialize({ input }, {
+            input: { id: 7 },
+            $: { input: 'A' },
         });
 
         tester.forEach(serializer => {
@@ -440,16 +434,13 @@ describe('complex inheritance', () => {
     test('prototype lookup prefers nearest transformer in inheritance chain', () => {
         const input = new D(42, 'nearest', false, 'extra');
 
-        tester.serialize({ input }, (serialized, serializer) => {
-            const expected = Tester.addVersionToSerialized(serializer, {
-                input: {
-                    id: 42,
-                    label: 'nearest',
-                    isActive: false,
-                },
-                $: { input: 'C' },
-            });
-            expect(serialized).toStrictEqual(expected);
+        tester.serialize({ input }, {
+            input: {
+                id: 42,
+                label: 'nearest',
+                isActive: false,
+            },
+            $: { input: 'C' },
         });
 
         tester.forEach(serializer => {

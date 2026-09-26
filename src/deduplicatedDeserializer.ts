@@ -1,17 +1,21 @@
 import type { SortObjectKeysOption } from './config.ts';
 import { Deserializer } from './deserializer.ts';
-import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey, type RootJsonObject } from './json.ts';
+import { ESCAPE_CHAR, REFERENCE_ANNOTATION, type Annotations, type JsonArray, type JsonEntity, type JsonObject, type JsonValue, type EntityId, type Annotation, type CompositeAnnotation, unescapeKey } from './json.ts';
 import { validateObjectKeyForPrototypePollution, type ObjectLike } from './transformers.ts';
+
+const ROOT_ENTITY_ID = 0;
 
 export class DeduplicatedDeserializer extends Deserializer {
     private sortObjectKeys!: SortObjectKeysOption;
 
-    override deserialize(root: RootJsonObject) {
+    protected override deserializeUnwrapped(serialized: JsonValue) {
         this.sortObjectKeys = this.config.sortObjectKeys;
 
         if (this.sortObjectKeys === 'catch') {
+            const rootAnnotation = this.annotation;
+
             try {
-                return super.deserialize(root);
+                return this.deserializeValue(serialized);
             }
             catch (error) {
                 if (error !== expectedReferenceError)
@@ -19,13 +23,20 @@ export class DeduplicatedDeserializer extends Deserializer {
 
                 // Try again, but this time with sorting enabled.
                 this.sortObjectKeys = 'always';
+
+                // Completely reset the context to avoid any issues with references.
+                // This is not very clean, but it works. Another option would be to create a new instance of the deserializer, but we would have to go through the unwrapping and other stuff.
+                this.annotation = rootAnnotation;
+                this.compositeIndex = undefined;
+                this.entityId = ROOT_ENTITY_ID;
+                this.referencedEntities.clear();
             }
         }
 
         if (this.sortObjectKeys === 'always')
-            root = checkOrSortObjectKeys(root) as RootJsonObject;
+            serialized = checkOrSortObjectKeys(serialized);
 
-        return super.deserialize(root);
+        return this.deserializeValue(serialized);
     }
 
     // #region Annotations
@@ -52,7 +63,7 @@ export class DeduplicatedDeserializer extends Deserializer {
     // By default, we set it to 0 which is the root entity id. The root entity doesn't have an explicit id because there is nowhere to store it. But it's always 0 so we don't even need to store it.
 
     /** If the entity is referenced, this is its id. If not, it is undefined. */
-    private entityId: EntityId | undefined = 0;
+    private entityId: EntityId | undefined = ROOT_ENTITY_ID;
 
     protected override trySetReference(value: ObjectLike) {
         const entityId = this.entityId;
@@ -88,8 +99,15 @@ export class DeduplicatedDeserializer extends Deserializer {
 
 const expectedReferenceError = Symbol('ExpectedReferenceError');
 
-function checkOrSortObjectKeys(value: JsonObject): JsonObject {
-    return processObject(value).sortedEntity as JsonObject | undefined ?? value;
+function checkOrSortObjectKeys(value: JsonValue): JsonValue {
+    if (typeof value !== 'object' || value === null)
+        return value;
+
+    const processed = Array.isArray(value)
+        ? processArray(value, undefined)
+        : processObject(value);
+
+    return processed.sortedEntity ?? value;
 }
 
 // JSON doesn't guarantee the order of object keys. This is kinda not ideal as the references require the referenced entities to be already deserialized.

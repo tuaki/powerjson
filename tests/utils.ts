@@ -49,13 +49,24 @@ export class Tester {
         };
     }
 
-    serialize(input: unknown, callback: (serialized: JsonObject, serializer: PowerJson) => void) {
+    serializeCallback(input: unknown, callback: (serialized: JsonObject, serializer: PowerJson) => void) {
         for (const serializer of this.serializers) {
-            deepFreeze(input);
-
-            const serialized = serializer.serialize(input);
+            const serialized = this.testSerialize(serializer, input, undefined);
             callback(serialized, serializer);
         }
+    }
+
+    serialize<TInput = unknown>(input: TInput, ...expectedSerialized: (JsonObject | undefined)[]): JsonObject[] {
+        const allSerialized: JsonObject[] = [];
+
+        let i = 0;
+        for (const serializer of this.serializers) {
+            const serialized = this.testSerialize(serializer, input, expectedSerialized[i]);
+            allSerialized.push(serialized);
+            i = (i + 1) % expectedSerialized.length;
+        }
+
+        return allSerialized;
     }
 
     serializeDeserialize<TInput = unknown>(input: TInput, ...expectedSerialized: (JsonObject | undefined)[]): TInput[] {
@@ -63,11 +74,7 @@ export class Tester {
 
         let i = 0;
         for (const serializer of this.serializers) {
-            let expected = expectedSerialized[i];
-            if (expected)
-                expected = Tester.addVersionToSerialized(serializer, expected);
-
-            const output = this.testSerializeDeserialize(serializer, input, expected, this.reverseJsonOrder);
+            const output = this.testSerializeDeserialize(serializer, input, expectedSerialized[i], this.reverseJsonOrder);
             outputs.push(output);
             i = (i + 1) % expectedSerialized.length;
         }
@@ -75,14 +82,21 @@ export class Tester {
         return outputs;
     }
 
-    private testSerializeDeserialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: JsonObject | undefined, reverseJsonOrder: boolean): TInput {
-    // Make sure the input is not mutated during serialization.
+    private testSerialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: JsonObject | undefined): JsonObject {
+        // Make sure the input is not mutated during serialization.
         deepFreeze(input);
 
-        let serialized = serializer.serialize(input);
-        if (expectedSerialized !== undefined)
-            expect(serialized).toStrictEqual(expectedSerialized);
+        const serialized = serializer.serialize(input);
+        if (expectedSerialized !== undefined) {
+            const expected = Tester.addVersionToSerialized(serializer, expectedSerialized);
+            expect(serialized).toStrictEqual(expected);
+        }
 
+        return serialized;
+    }
+
+    private testSerializeDeserialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: JsonObject | undefined, reverseJsonOrder: boolean): TInput {
+        let serialized = this.testSerialize(serializer, input, expectedSerialized);
         if (reverseJsonOrder)
             serialized = reverseObjectKeys(serialized);
 

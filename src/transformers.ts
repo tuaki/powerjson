@@ -68,6 +68,12 @@ export type Transformer<TObject extends ObjectLike = ObjectLike, TJson extends J
      * Composite types are serialized as arrays and share one composite annotation. Non-composite types are serialized as objects (and have their own annotations) or primitives.
      */
     isComposite: boolean;
+    /**
+     * If `true` and the object has a `toJSON` method, it will be called and the result will be serialized instead of the object itself.
+     * If the `toJSON` output also has a `toJSON` method, it won't be called again (this is consistent with `JSON.stringify` behavior). However, if it's an object, a new transformer will be searched for.
+     * This option is here mainly for the `Object` and `Array` transformers to mimic the default "plain object" behavior. Also note that if `toJSON` is called, the type information of the original object is lost. So, if a custom class already implements a transformer, it should use its `serialize` method directly instead of relying on `toJSON`.
+     */
+    useToJSON: boolean;
 };
 
 type Class<T> = {
@@ -90,10 +96,12 @@ export function transformer<TObject extends ObjectLike, TJson extends JsonValue>
     deserialize: (value: TJson, deserializer: Deserializer) => TObject;
     isEntity?: boolean;
     isComposite?: boolean;
+    useToJSON?: boolean;
 }): Transformer<TObject, TJson> {
     return {
         isEntity: false,
         isComposite: false,
+        useToJSON: false,
         ...options,
     };
 }
@@ -112,6 +120,7 @@ const plainObjectTransformer = transformer({
     serialize: (value, serializer) => serializer.serializePlainObject(value),
     deserialize: (value, deserializer) => deserializer.deserializePlainObject(value),
     isEntity: true,
+    useToJSON: true,
 });
 
 /**
@@ -155,6 +164,7 @@ const arrayTransformer = transformer({
     deserialize: (value, deserializer) => deserializer.deserializeArray(value),
     isEntity: true,
     isComposite: true,
+    useToJSON: true,
 });
 
 const setTransformer = transformer({

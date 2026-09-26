@@ -1,23 +1,14 @@
 import { REFERENCE_ANNOTATION, type AnnotatedJsonObject, type TypeId, type Annotations, type EntityId, type CompositeAnnotation, ESCAPE_CHAR } from './json.ts';
 import { isAnnotationsNotEmpty, Serializer } from './serializer.ts';
-import type { ObjectLike, PlainObject } from './transformers.ts';
+import type { ObjectLike } from './transformers.ts';
 
 export class DeduplicatedSerializer extends Serializer {
-    protected override serializeRootObject(input: PlainObject) {
-        const serialized = this.serializePlainObject(input);
-
-        addIdentityAnnotations(this.seenEntities);
-
-        this.addNonEmptyAnnotations();
-
-        return serialized;
-    }
-
     // #region Annotations
 
-    // We don't want empty annotations objects in the output. However, we can't just throw them away because a references might be added to them later. So, we store them all and revisit them later.
+    protected override finalizeAnnotations() {
+        addIdentitiesToAnnotations(this.seenEntities);
 
-    private addNonEmptyAnnotations() {
+        // Add all non-empty annotations to their corresponding objects.
         const length = this.objectAnnotationPairs.length;
         for (let i = 0; i < length; i += 2) {
             const annotations = this.objectAnnotationPairs[i + 1] as Annotations;
@@ -33,6 +24,7 @@ export class DeduplicatedSerializer extends Serializer {
     private readonly objectAnnotationPairs: (AnnotatedJsonObject | Annotations)[] = [];
 
     protected override storeEmptyAnnotation(value: AnnotatedJsonObject, annotations: Annotations) {
+        // We don't want empty annotations objects in the output. However, we can't just throw them away because a references might be added to them later. So, we store them all and revisit them later.
         this.objectAnnotationPairs.push(value, annotations);
     }
 
@@ -76,18 +68,20 @@ type EntityData = {
 
     // Entity context
 
-    /** Undefined for root. */
-    annotations: Annotations | undefined;
-    /** Undefined for root. */
-    key: string | undefined;
+    annotations: Annotations;
+    key: string;
     /** Undefined if the entity is not an array / is not a direct child of an array. */
     compositeIndex: number | undefined;
 };
 
-function addIdentityAnnotations(seenEntities: Map<ObjectLike, EntityData>) {
-    for (const entityData of seenEntities.values()) {
-        // The root is always 0, so we don't have to store its referenceId. Like we can't event if we wanted to, because the root has no parent (but we also don't want to).
-        if (!entityData.isReferenced || entityData.annotations === undefined)
+function addIdentitiesToAnnotations(seenEntities: Map<ObjectLike, EntityData>) {
+    const iterator = seenEntities.values();
+    // The root is always 0, so we don't have to store its referenceId. Like we can't event if we wanted to, because the root has no parent (but we also don't want to).
+    // So, let's just skip it.
+    iterator.next();
+
+    for (const entityData of iterator) {
+        if (!entityData.isReferenced)
             continue;
 
         const { id, annotations, compositeIndex } = entityData;

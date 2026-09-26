@@ -1,6 +1,12 @@
-import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type RootJsonObject, type TypeId } from './json.ts';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type SerializedValue, type TypeId } from './json.ts';
 import { isPlainObject, serializeNumber, validateObjectKeyForPrototypePollution, type ObjectLike, type PlainObject } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
+
+/**
+ * Key of the root value in the annotations.
+ * The value was chosen to be equal to the argument passed to the `toJSON` method if called on the root value.
+ */
+const ROOT_KEY = '';
 
 export abstract class Serializer {
     readonly config: PowerJsonConfig;
@@ -9,36 +15,63 @@ export abstract class Serializer {
         this.config = config;
     }
 
-    serialize(input: unknown): RootJsonObject {
-        // If the top-level value isn't a plain object, we have to wrap it so that it can put its annotations somewhere.
-        const isWrapped = !isPlainObject(input);
+    serialize(input: unknown): SerializedValue {
+        const rootAnnotations = this.annotations;
 
-        const rootObject = isWrapped ? { [WRAPPED_KEY]: input } : input;
-        this.trySetReference(rootObject);
+        let serialized = this.serializeUnknown(input);
 
-        const serialized = this.serializeRootObject(rootObject);
+        this.finalizeAnnotations();
 
-        let annotations = serialized[ESCAPE_CHAR];
-        if (annotations === undefined) {
-            annotations = {};
-            serialized[ESCAPE_CHAR] = annotations;
+        let output: SerializedValue;
+        let annotations: SerializedValue[typeof ESCAPE_CHAR];
+
+        let isRootKeyInAnnotations = ROOT_KEY in rootAnnotations;
+        if (isRootKeyInAnnotations || !isPlainObject(serialized)) {
+            // We have to wrap the serialized value in a wrapper object.
+            if (serialized === undefined) {
+                // This is a very strange edge case that shouldn't really happen unless someone tries to serialize sth like function or creates a custom transformer that returns `undefined` for the root value.
+                // Let's just serialize it as `undefined` and move on. We only add the undefined annotation if needed tho.
+                serialized = null;
+                rootAnnotations[ROOT_KEY] = rootAnnotations[ROOT_KEY] ?? UNDEFINED_ANNOTATION;
+                isRootKeyInAnnotations = true;
+            }
+
+            annotations = {
+                [ESCAPE_CHAR]: this.config.version,
+                [WRAPPED_DIRECTIVE]: true,
+            };
+
+            if (isRootKeyInAnnotations)
+                annotations[WRAPPED_KEY] = rootAnnotations[ROOT_KEY];
+
+            output = {
+                [WRAPPED_KEY]: serialized,
+                [ESCAPE_CHAR]: annotations,
+            };
         }
+        else {
+            // No wrapping needed - let's just make sure the root annotations exists so that we can add the algorithm version to it.
+            output = serialized as SerializedValue;
+            annotations = output[ESCAPE_CHAR];
+            if (annotations === undefined) {
+                annotations = {} as RootAnnotations;
+                output[ESCAPE_CHAR] = annotations;
+            }
+        }
+
+        // In both cases, we need to add the algorithm version to the annotations.
         annotations[ESCAPE_CHAR] = this.config.version;
 
-        if (isWrapped)
-            (annotations as RootAnnotations)[WRAPPED_DIRECTIVE] = true;
-
-        return serialized as RootJsonObject;
+        return output;
     }
 
-    protected abstract serializeRootObject(input: PlainObject): AnnotatedJsonObject;
+    /** Hook that gets called after all objects have been serialized. */
+    protected abstract finalizeAnnotations(): void;
 
     // #region Context
 
-    // This is defined after the first call to `serializePlainObject` so it's essentially always defined.
-    protected annotations!: Annotations;
-    /** Undefined for the root level, defined otherwise. */
-    protected key: string | undefined;
+    protected annotations: Annotations = {};
+    protected key: string = ROOT_KEY;
     /**
      * If we are directly in a composite (array with any nesting level), this is its index.
      * It's basically a flat index (all nesting levels share the same counter). The top-level array has index 0.
@@ -49,8 +82,7 @@ export abstract class Serializer {
     // #region Annotations
 
     protected addAnnotation(typeId: TypeId): void {
-        // At this point, the key must be defined - we can't add annotations on the root level (the root is always a plain object).
-        const key = this.key!;
+        const key = this.key;
 
         if (this.compositeIndex === undefined) {
             // No need to check for an old composite since we are not nested in any array, so no composite can exist yet.
@@ -195,7 +227,7 @@ export abstract class Serializer {
     // #region Transformers
 
     /** Returns `undefined` if the value should be skipped. This doesn't work everywhere, though (e.g., in arrays). */
-    private serializeUnknown(value: unknown): JsonValue | undefined {
+    private serializeUnknown(value: unknown, checkToJson = true): JsonValue | undefined {
         switch (typeof value) {
             case 'string':
             case 'boolean':
@@ -222,15 +254,25 @@ export abstract class Serializer {
                 return serialized;
             }
             case 'object':
-                return value === null ? null : this.serializeObjectLike(value);
+                return value === null ? null : this.serializeObjectLike(value, checkToJson);
             case 'function':
                 // This ain't gonna happen.
                 return undefined;
         }
     }
 
-    private serializeObjectLike(value: ObjectLike): JsonValue | undefined {
+    private serializeObjectLike(value: ObjectLike, checkToJson: boolean): JsonValue | undefined {
         const transformer = this.config.getObjectTransformer(value);
+        if (transformer.useToJSON && checkToJson && 'toJSON' in value && typeof value.toJSON === 'function') {
+            const key = this.compositeIndex === undefined
+                ? this.key
+                // Yes, we should use an index in the actual array this value is in. But that would introduce another overhead which, at this point, is probably not worth it.
+                // Besides that, in a complex array structure (e.g., maps), a composite index probably better represents the "context" of the value than the index in the actual array.
+                : String(this.compositeIndex);
+
+            const plainValue = (value.toJSON as (key: string) => unknown)(key);
+            return this.serializeUnknown(plainValue, false);
+        }
 
         if (transformer.isComposite && this.compositeIndex === undefined)
             this.compositeIndex = 0;

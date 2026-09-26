@@ -1,13 +1,13 @@
 import { REFERENCE_ANNOTATION } from './json.ts';
 import { Serializer } from './serializer.ts';
-import type { ObjectLike, PlainObject } from './transformers.ts';
+import type { ObjectLike } from './transformers.ts';
 
 export class SimpleSerializer extends Serializer {
-    protected override serializeRootObject(input: PlainObject) {
-        return this.serializePlainObject(input);
-    }
-
     // #region Annotations
+
+    protected override finalizeAnnotations() {
+        // Nothing to do here, we have already processed all annotations.
+    }
 
     protected override storeEmptyAnnotation() {
         // Nothing to do here - there is no way to add anything to an empty annotations object, so we can just skip it.

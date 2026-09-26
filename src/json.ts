@@ -15,10 +15,20 @@ export type CompositeAnnotation = Record<number, Annotation>;
 
 /** The wrapped directive can be only on the root. No need to check for it elsewhere. */
 export type Annotations = Record<string, Annotation | CompositeAnnotation>;
-export type RootAnnotations = Annotations & { [ESCAPE_CHAR]: AlgorithmVersion, [WRAPPED_DIRECTIVE]?: true };
+export type RootAnnotations = Annotations & { [ESCAPE_CHAR]: AlgorithmVersion };
 
 export type AnnotatedJsonObject = JsonObject & { [ESCAPE_CHAR]?: Annotations };
-export type RootJsonObject = JsonObject & { [ESCAPE_CHAR]: RootAnnotations };
+type RootJsonObject = JsonObject & { [ESCAPE_CHAR]: RootAnnotations };
+type WrappedJsonValue = {
+    [WRAPPED_KEY]: JsonValue;
+    [ESCAPE_CHAR]: {
+        [WRAPPED_KEY]?: Annotations[string];
+        [ESCAPE_CHAR]: AlgorithmVersion;
+        [WRAPPED_DIRECTIVE]: true;
+    };
+};
+
+export type SerializedValue = RootJsonObject | WrappedJsonValue;
 
 /** For efficient escaping, this has to be a single character. */
 export const ESCAPE_CHAR = '$';

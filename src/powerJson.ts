@@ -18,8 +18,8 @@ export class PowerJson {
         return serialize(input, this.config);
     }
 
-    deserialize<T = unknown>(jsonValue: JsonObject): T {
-        return deserialize<T>(jsonValue, this.config);
+    deserialize<T = unknown>(jsonObject: JsonObject): T {
+        return deserialize<T>(jsonObject, this.config);
     }
 
     stringify(input: unknown): string {
