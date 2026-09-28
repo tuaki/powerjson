@@ -1,10 +1,9 @@
 import { faker } from '@faker-js/faker';
-import Table from 'cli-table3';
 import { BENCHMARK_ITERATIONS_SCALE, BENCHMARK_SEED, DISPLAY_VERBOSE_RESULTS, RELATIVE_SPREAD_WARNING_THRESHOLD, WARMUP_ITERATIONS_RATIO } from './config.ts';
-import { findBestStat, formatBestStat, renderRelativeCell } from './format.ts';
+import { findBestStat, formatBestStat, renderRelativeCell, type Formatter } from './format.ts';
 import { addStats, createSeededRNG, forceGc, hashString, printBenchmarkError, printWarning, relativeSpread, selectUnit, shuffleInPlace, statFromSamples, type InputValue, type Scenario, type Serializer, type Stat, type Unit } from './utils.ts';
 
-export function runScenarios(scenarios: Scenario[], serializers: Serializer[]): ScenarioResult[] {
+export function runScenarios(scenarios: Scenario[], serializers: Serializer[], formatter: Formatter): ScenarioResult[] {
     console.log(`Running ${scenarios.length} benchmark scenarios on ${serializers.length} serializers...`);
 
     const results: ScenarioResult[] = [];
@@ -19,7 +18,7 @@ export function runScenarios(scenarios: Scenario[], serializers: Serializer[]): 
         const result = runScenario(scenario, serializers);
         results.push(result);
         if (DISPLAY_VERBOSE_RESULTS)
-            printScenarioResults(result, serializers);
+            printScenarioResults(result, serializers, formatter);
     }
 
     return results;
@@ -289,7 +288,7 @@ function getUtf8ByteLength(value: string): number {
     return new TextEncoder().encode(value).length;
 }
 
-function printScenarioResults(result: ScenarioResult, serializers: Serializer[]) {
+function printScenarioResults(result: ScenarioResult, serializers: Serializer[], formatter: Formatter) {
     const timeUnit = selectUnit('time', result.results.flatMap(r => [
         r.serializeMs.value,
         r.toJsonMs.value,
@@ -323,16 +322,12 @@ function printScenarioResults(result: ScenarioResult, serializers: Serializer[])
 
     const bestStats = columns.map(column => findBestStat(column.stats));
     const renderedColumns = columns.map((column, index) => {
-        return column.stats.map(stat => renderRelativeCell(stat, column.unit, bestStats[index], undefined));
+        return column.stats.map(stat => renderRelativeCell(formatter, stat, column.unit, bestStats[index], undefined));
     });
 
-    const table = new Table({
-        head: [ 'serializer', ...columns.map(column => column.label) ],
-        style: {
-            head: [ 'white', 'bold' ],
-            border: [ 'white' ],
-        },
-    });
+    const table = formatter.createTable();
+
+    table.push([ 'serializer', ...columns.map(column => column.label) ]);
 
     table.push([ 'Best', ...bestStats.map((stat, index) => formatBestStat(stat, columns[index]!.unit)) ]);
 
@@ -340,7 +335,7 @@ function printScenarioResults(result: ScenarioResult, serializers: Serializer[])
         table.push([ serializer.name, ...renderedColumns.map(column => column[rowIndex]!) ]);
     });
 
-    process.stdout.write(table.toString());
+    process.stdout.write(formatter.table(table));
     process.stdout.write('\n');
 }
 

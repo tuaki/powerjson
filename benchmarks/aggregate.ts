@@ -1,6 +1,5 @@
-import Table from 'cli-table3';
 import type { ScenarioResult, SerializerResult } from './measure.ts';
-import { formatBestStat, colorBold, renderRelativeCell } from './format.ts';
+import { formatBestStat, renderRelativeCell, type Formatter } from './format.ts';
 import { selectUnit, type Stat, type Unit, type UnitType } from './utils.ts';
 
 export type ComparisonMetric = {
@@ -15,6 +14,7 @@ export type ComparisonGroup = {
     serializers: string[];
     metrics: ComparisonMetric[];
     label?: string;
+    formatter: Formatter;
 };
 
 export function printComparisonTables(results: ScenarioResult[], groups: ComparisonGroup[]) {
@@ -54,7 +54,7 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup)
             for (const serializerName of group.serializers) {
                 const serializerResult = bySerializer.get(serializerName);
                 const stat = serializerResult && metric.value(serializerResult);
-                row.push(renderRelativeCell(stat, unit, bestCompared, bestGlobal));
+                row.push(renderRelativeCell(group.formatter, stat, unit, bestCompared, bestGlobal));
             }
         }
 
@@ -63,25 +63,20 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup)
 
     console.log('');
 
-    const table = new Table({
-        // There is no head - we need to create a custom header because we want the multi-column metrics first.
-        style: {
-            border: [ 'white' ],
-        },
-    });
+    const table = group.formatter.createTable();
 
     table.push([
         { content: '', colSpan: 1 },
         ...metrics.map(metric => ({
-            content: colorBold(metric.label ?? metric.id),
+            content: metric.label ?? metric.id,
             colSpan: group.serializers.length + 1,
         })),
     ]);
-    table.push(columns.map(column => colorBold(column)));
+    table.push(columns);
 
     table.push(...rows);
 
-    process.stdout.write(table.toString());
+    process.stdout.write(group.formatter.table(table, 2));
     process.stdout.write('\n');
 }
 

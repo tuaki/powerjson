@@ -10,6 +10,7 @@ import { mixedExtendedTypesScenario } from './scenarios/mixedExtendedTypes.ts';
 import { printComparisonTables, type ComparisonGroup, type ComparisonMetric } from './aggregate.ts';
 import { ONLY_EXAMPLE_SCENARIO, REFERENCE_DATE } from './config.ts';
 import { devalueSerializer, jsonSerializer, nextJsonSerializer, serializeJavascriptSerializer, superJsonSerializer, powerJsonSerializer } from './serializers.ts';
+import { CliFormatter, MarkdownFormatter } from './format.ts';
 
 function main() {
     faker.setDefaultRefDate(REFERENCE_DATE);
@@ -17,7 +18,7 @@ function main() {
     const scenarios = createScenarios();
     const serializers = createSerializers();
 
-    const scenarioResults = runScenarios(scenarios, serializers);
+    const scenarioResults = runScenarios(scenarios, serializers, cliFormatter);
     printComparisonTables(scenarioResults, comparisonGroups);
 }
 
@@ -61,23 +62,43 @@ const allMetrics: ComparisonMetric[] = [ {
     value: result => result.stringSizeBytes,
 } ];
 
+const cliFormatter = new CliFormatter();
+const markdownFormatter = new MarkdownFormatter();
+
 const nonJsonSerializers = [ 'powerjson v1', 'powerjson v2', 'superjson v1', 'superjson v2', 'devalue', 'serialize-javascript', 'next-json' ];
 
 const comparisonGroups: ComparisonGroup[] = [ {
     serializers: [ 'powerjson v1', 'superjson v1' ],
     metrics: allMetrics,
+    formatter: cliFormatter,
 }, {
     serializers: [ 'powerjson v2', 'superjson v2' ],
     metrics: allMetrics,
+    formatter: cliFormatter,
 }, {
     serializers: nonJsonSerializers,
     metrics: [ allMetrics[0] ],
+    formatter: markdownFormatter,
 }, {
     serializers: nonJsonSerializers,
     metrics: [ allMetrics[1] ],
+    formatter: markdownFormatter,
 }, {
     serializers: nonJsonSerializers,
     metrics: [ allMetrics[2] ],
+    formatter: markdownFormatter,
+}, {
+    serializers: nonJsonSerializers,
+    metrics: [ allMetrics[0] ],
+    formatter: cliFormatter,
+}, {
+    serializers: nonJsonSerializers,
+    metrics: [ allMetrics[1] ],
+    formatter: cliFormatter,
+}, {
+    serializers: nonJsonSerializers,
+    metrics: [ allMetrics[2] ],
+    formatter: cliFormatter,
 } ];
 
 main();
