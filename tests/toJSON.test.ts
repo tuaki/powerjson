@@ -79,15 +79,15 @@ describe('toJSON on plain objects and arrays', () => {
         });
     });
 
-    test('toJSON is ignored for built-in transformers, even ones (like Date) with a native toJSON', () => {
+    test('toJSON is ignored for built-in transformers, even ones (like URL) with a native toJSON', () => {
         // `Date.prototype.toJSON` exists natively, so this specifically checks that our own `useToJSON` flag (not just the mere presence of a `toJSON` method) gates the behavior.
-        const date = Object.assign(new Date('2020-01-01T00:00:00.000Z'), { toJSON: () => 'HIJACKED' });
+        const url = Object.assign(new URL('https://example.com/'), { toJSON: () => 'HIJACKED' });
         const set = Object.assign(new Set([ 1, 2 ]), { toJSON: () => 'HIJACKED' });
 
-        tester.serialize({ date, set }, {
-            date: '2020-01-01T00:00:00.000Z',
+        tester.serialize({ url, set }, {
+            url: 'https://example.com/',
             set: [ 1, 2 ],
-            $: { date: 'Date', set: { 0: 'Set' } },
+            $: { url: 'URL', set: { 0: 'Set' } },
         });
     });
 

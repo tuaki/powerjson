@@ -1,5 +1,5 @@
 import type { AlgorithmVersion, TypeId } from './json.ts';
-import { baseTransformers, typedArrayTransformers, type ObjectLike, type Transformer } from './transformers.ts';
+import { baseTransformers, type ObjectLike, type Transformer } from './transformers.ts';
 
 export type PowerJsonOptions = {
     /**
@@ -67,7 +67,6 @@ export class PowerJsonConfig {
 
         [
             ...baseTransformers,
-            ...typedArrayTransformers,
             ...transformers,
         ].forEach(transformer => this.registerTransformer(transformer));
 

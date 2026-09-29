@@ -90,7 +90,7 @@ These types are supported by PowerJson (so far). More types will be added as the
 | `Set`                                                                                      | ❌                          | ✅                      |
 | `Map`                                                                                      | ❌                          | ✅                      |
 | `Date`                                                                                     | ❌                          | ✅                      |
-| `Temporal`                                                                                 | ❌                          | ❌ TODO                 |
+| `Temporal`                                                                                 | ❌                          | ✅                      |
 | `RegExp`                                                                                   | ❌                          | ✅                      |
 | `URL`                                                                                      | ❌                          | ✅                      |
 | `Error`                                                                                    | ❌                          | ✅                      |

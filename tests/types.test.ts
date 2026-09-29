@@ -199,15 +199,21 @@ describe('containers', () => {
         [ [ 'key', [ undefined ] ], [ [ undefined ], 'input' ] ],
         [ [ 'key', [ null ] ], [ [ null ], 'input' ] ],
         { input: { 0: 'Map', 4: 'undefined', 7: 'undefined' } },
-        // TODO This fails right now because of a bug in bun.
-        // see https://github.com/oven-sh/bun/issues/34830
+    ] ])('map %p to %p', (input, expected, annotations) => {
+        tester.serializeDeserialize({ input: new Map(input) }, {
+            input: expected,
+            $: annotations,
+        });
+    });
+
+    // TODO Upstream bug (see https://github.com/oven-sh/bun/issues/34830)
+    test.skip.each<[[unknown, unknown][], JsonMap, Annotations]>([ [
         // A copy of a superJson test. It works in both libraries, but differently.
         // - They treat regexes as entities, so their keys are unique.
         // - We treat regexes as values, however, internally are still entities. So, they are still unique keys.
-        // ], [
-        //     [ [ /a/g, 'foo' ], [ /a/g, 'bar' ] ],
-        //     [ [ '/a/g', 'foo' ], [ '/a/g', 'bar' ] ],
-        //     { input: { 0: 'Map', 2: 'RegExp', 5: 'RegExp' } },
+        [ [ /a/g, 'foo' ], [ /a/g, 'bar' ] ],
+        [ [ '/a/g', 'foo' ], [ '/a/g', 'bar' ] ],
+        { input: { 0: 'Map', 2: 'RegExp', 5: 'RegExp' } },
     ] ])('map %p to %p', (input, expected, annotations) => {
         tester.serializeDeserialize({ input: new Map(input) }, {
             input: expected,
@@ -340,50 +346,23 @@ describe('root arrays', () => {
     });
 });
 
-describe('typed arrays', () => {
-    test.each([
-        [ new Uint8Array([]), '' ],
-        [ new Uint8Array([ 0 ]), 'AA==' ],
-        [ new Uint8Array([ 0, 1 ]), 'AAE=' ],
-        [ new Uint8Array([ 0, 1, 2 ]), 'AAEC' ],
-        [ new Uint8Array([ 0, 1, 2, 3 ]), 'AAECAw==' ],
-        [ new Uint8Array([ 248 ]), '-A==' ], // url-safe base64 encoding
-        [ new Uint8Array(new Uint8Array([ 1, 1, 0, 1 ]).buffer, 2, 1), 'AA==' ], // same as [ 0 ]
-    ])('Uint8Array %p to %s', (input, expected) => {
-        tester.serializeDeserialize({ input }, {
-            input: expected,
-            $: { input: 'Uint8Array' },
-        });
-        tester.serializeDeserialize(input, wrap(expected, 'Uint8Array'));
-    });
-
-    test.each([
-        [ new Float64Array([]), '' ],
-        [ new Float64Array([ 0.123 ]), 'sHJoke18vz8=' ],
-        [ new Float64Array([ 0.123, 1.456 ]), 'sHJoke18vz-yne-nxkv3Pw==' ],
-        [ new Float64Array([ -0, Infinity, -Infinity ]), 'AAAAAAAAAIAAAAAAAADwfwAAAAAAAPD_' ],
-        // TODO For some reason, NaN fails. Maybe bun uses a different NaN comparison for Float64Array?
-        // see https://github.com/oven-sh/bun/issues/34815
-        // [ new Float64Array([ NaN ]), 'AAAAAAAA-H8=' ],
-        // [ new Float64Array([ NaN, -0, Infinity, -Infinity ]), 'AAAAAAAA-H8AAAAAAAAAgAAAAAAAAPB_AAAAAAAA8P8=' ],
-        [ new Float64Array([ Number.MAX_SAFE_INTEGER * 2 ]), '________T0M=' ],
-    ])('Float64Array %p to %s', (input, expected) => {
-        tester.serializeDeserialize({ input }, {
-            input: expected,
-            $: { input: 'Float64Array' },
-        });
-        tester.serializeDeserialize(input, wrap(expected, 'Float64Array'));
-    });
-});
-
 describe('predefined types', () => {
     test.each([
         [ new Date('2000-01-01T00:00:00.000Z'), '2000-01-01T00:00:00.000Z' ],
         [ new Date('1234-12-12T12:34:56.789Z'), '1234-12-12T12:34:56.789Z' ],
-        // TODO toStrictEqual returns false for two invalid dates (even though it returns true for two NaNs).
-        // see https://github.com/oven-sh/bun/issues/34816
-        // Once it's fixed, unify this test with the one below.
-        // [ new Date(NaN), null ],
+    ])('Date %p to %p', (input, expected) => {
+        tester.serializeDeserialize({ input }, {
+            input: expected,
+            $: { input: 'Date' },
+        });
+        tester.serializeDeserialize(input, wrap(expected, 'Date'));
+    });
+
+    // TODO Upstream bug (see https://github.com/oven-sh/bun/issues/34816)
+    // `toStrictEqual` returns false for two invalid dates (even though it returns true for two NaNs).
+    // Once it's fixed, unify this test with the one below.
+    test.skip.each([
+        [ new Date(NaN), null ],
     ])('Date %p to %p', (input, expected) => {
         tester.serializeDeserialize({ input }, {
             input: expected,
@@ -399,7 +378,96 @@ describe('predefined types', () => {
         });
     });
 
-    // TODO Add support for Temporal
+    test.each([
+        [ new Temporal.Duration(1, 2, 3, 4, 5, 6, 7, 8, 9, 10), 'Temporal.Duration', 'P1Y2M3W4DT5H6M7.00800901S' ],
+        [ new Temporal.Instant(946684800000000000n), 'Temporal.Instant', '2000-01-01T00:00:00Z' ],
+        [ new Temporal.PlainDate(2000, 1, 1), 'Temporal.PlainDate', '2000-01-01' ],
+        [ new Temporal.PlainDateTime(2000, 1, 1, 12, 30, 15), 'Temporal.PlainDateTime', '2000-01-01T12:30:15' ],
+        [ new Temporal.PlainMonthDay(1, 1), 'Temporal.PlainMonthDay', '01-01' ],
+        [ new Temporal.PlainTime(12, 30, 15), 'Temporal.PlainTime', '12:30:15' ],
+        [ new Temporal.PlainYearMonth(2000, 1), 'Temporal.PlainYearMonth', '2000-01' ],
+        [ new Temporal.ZonedDateTime(946684800000000000n, 'America/New_York'), 'Temporal.ZonedDateTime', '1999-12-31T19:00:00-05:00[America/New_York]' ],
+    ])('Temporal %p to %p', (input, typeName, expected) => {
+        tester.serializeDeserialize({ input }, {
+            input: expected,
+            $: { input: typeName },
+        });
+        tester.serializeDeserialize(input, wrap(expected, typeName));
+    });
+
+    describe('Temporal edge cases', () => {
+        test.each([
+            [ new Temporal.Duration(-1, -2, -3, -4, -5, -6, -7, -8, -9, -10), '-P1Y2M3W4DT5H6M7.00800901S' ],
+            [ new Temporal.Duration(), 'PT0S' ],
+        ])('negative/zero %p to %p', (input, expected) => {
+            tester.serializeDeserialize({ input }, {
+                input: expected,
+                $: { input: 'Temporal.Duration' },
+            });
+            tester.serializeDeserialize(input, wrap(expected, 'Temporal.Duration'));
+        });
+
+        test('non-ISO calendar PlainDate', () => {
+            const input = new Temporal.PlainDate(2000, 1, 1, 'hebrew');
+            tester.serializeDeserialize({ input }, {
+                input: '2000-01-01[u-ca=hebrew]',
+                $: { input: 'Temporal.PlainDate' },
+            });
+        });
+
+        // TODO Upstream bug
+        // `PlainYearMonth`/`PlainMonthDay` keep an internal ISO "reference day" that isn't part of the calendar value itself. For non-ISO calendars, re-parsing the `toJSON()` string picks a new (but calendar-equivalent) reference day, so the round-tripped instance isn't `toStrictEqual` the original even though `year`/`monthCode` (or `monthCode`/`day`) match.
+        test.skip('non-ISO calendar PlainYearMonth', () => {
+            const input = new Temporal.PlainYearMonth(2000, 1, 'hebrew');
+            tester.serializeDeserialize({ input }, {
+                input: '2000-01-01[u-ca=hebrew]',
+                $: { input: 'Temporal.PlainYearMonth' },
+            });
+        });
+
+        // TODO Upstream bug (see above)
+        test.skip('non-ISO calendar PlainMonthDay', () => {
+            const input = new Temporal.PlainMonthDay(1, 1, 'hebrew');
+            tester.serializeDeserialize({ input }, {
+                input: '1972-01-01[u-ca=hebrew]',
+                $: { input: 'Temporal.PlainMonthDay' },
+            });
+        });
+
+        // TODO Upstream bug
+        // `PlainDateTime.prototype.toJSON` drops the `[u-ca=...]` annotation for non-ISO calendars (unlike `toString()`), so the calendar is lost on round-trip. Either Bun or JSCore bug.
+        test.skip('non-ISO calendar PlainDateTime', () => {
+            const input = new Temporal.PlainDateTime(2000, 1, 1, 12, 30, 15, 0, 0, 0, 'hebrew');
+            tester.serializeDeserialize({ input }, {
+                input: '2000-01-01T12:30:15[u-ca=hebrew]',
+                $: { input: 'Temporal.PlainDateTime' },
+            });
+        });
+
+        test.each([
+            // Just before the "spring forward" gap, so 2AM-3AM local time never happens on this day.
+            [ new Temporal.ZonedDateTime(1710050400000000000n, 'America/New_York'), '2024-03-10T01:00:00-05:00[America/New_York]' ],
+            // Inside the repeated (ambiguous) "fall back" hour; the offset in the string disambiguates it.
+            [ new Temporal.ZonedDateTime(1730613000000000000n, 'America/New_York'), '2024-11-03T01:50:00-04:00[America/New_York]' ],
+        ])('ZonedDateTime around a DST transition %p to %p', (input, expected) => {
+            tester.serializeDeserialize({ input }, {
+                input: expected,
+                $: { input: 'Temporal.ZonedDateTime' },
+            });
+            tester.serializeDeserialize(input, wrap(expected, 'Temporal.ZonedDateTime'));
+        });
+
+        test.each([
+            [ Temporal.Instant.from('-271821-04-20T00:00:00Z'), '-271821-04-20T00:00:00Z' ],
+            [ Temporal.Instant.from('+275760-09-13T00:00:00Z'), '+275760-09-13T00:00:00Z' ],
+        ])('Instant at the edge of the supported range %p to %p', (input, expected) => {
+            tester.serializeDeserialize({ input }, {
+                input: expected,
+                $: { input: 'Temporal.Instant' },
+            });
+            tester.serializeDeserialize(input, wrap(expected, 'Temporal.Instant'));
+        });
+    });
 
     test.each([
         [ /abc/g, '/abc/g' ],
@@ -421,5 +489,39 @@ describe('predefined types', () => {
             $: { input: 'URL' },
         });
         tester.serializeDeserialize(input, wrap(expected, 'URL'));
+    });
+
+    describe('typed arrays', () => {
+        test.each([
+            [ new Uint8Array([]), '' ],
+            [ new Uint8Array([ 0 ]), 'AA==' ],
+            [ new Uint8Array([ 0, 1 ]), 'AAE=' ],
+            [ new Uint8Array([ 0, 1, 2 ]), 'AAEC' ],
+            [ new Uint8Array([ 0, 1, 2, 3 ]), 'AAECAw==' ],
+            [ new Uint8Array([ 248 ]), '-A==' ], // url-safe base64 encoding
+            [ new Uint8Array(new Uint8Array([ 1, 1, 0, 1 ]).buffer, 2, 1), 'AA==' ], // same as [ 0 ]
+        ])('Uint8Array %p to %s', (input, expected) => {
+            tester.serializeDeserialize({ input }, {
+                input: expected,
+                $: { input: 'Uint8Array' },
+            });
+            tester.serializeDeserialize(input, wrap(expected, 'Uint8Array'));
+        });
+
+        test.each([
+            [ new Float64Array([]), '' ],
+            [ new Float64Array([ 0.123 ]), 'sHJoke18vz8=' ],
+            [ new Float64Array([ 0.123, 1.456 ]), 'sHJoke18vz-yne-nxkv3Pw==' ],
+            [ new Float64Array([ -0, Infinity, -Infinity ]), 'AAAAAAAAAIAAAAAAAADwfwAAAAAAAPD_' ],
+            [ new Float64Array([ NaN ]), 'AAAAAAAA-H8=' ],
+            [ new Float64Array([ NaN, -0, Infinity, -Infinity ]), 'AAAAAAAA-H8AAAAAAAAAgAAAAAAAAPB_AAAAAAAA8P8=' ],
+            [ new Float64Array([ Number.MAX_SAFE_INTEGER * 2 ]), '________T0M=' ],
+        ])('Float64Array %p to %s', (input, expected) => {
+            tester.serializeDeserialize({ input }, {
+                input: expected,
+                $: { input: 'Float64Array' },
+            });
+            tester.serializeDeserialize(input, wrap(expected, 'Float64Array'));
+        });
     });
 });

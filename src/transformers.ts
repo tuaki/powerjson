@@ -191,16 +191,33 @@ const mapTransformer = transformer({
 const dateTransformer = transformer({
     cls: Date,
     type: 'Date',
-    serialize: value => {
-        // Date can be invalid; let's serialize it as null.
-        return isNaN(+value) ? null : value.toISOString();
-    },
-    deserialize: value => {
-        return new Date(value === null ? NaN : value);
-    },
+    // Date can be invalid; toJSON automatically returns `null` in that case. Otherwise, it works exactly like `toISOString` (which is what we want).
+    // However, the function is typed wrong, so we need to cast it to the correct type.
+    serialize: value => value.toJSON() as string | null,
+    deserialize: value => new Date(value === null ? NaN : value),
 });
 
-// TODO Add support for Temporal
+// NICE_TO_HAVE Remove this once the support is universal.
+const temporalConstructors = typeof Temporal !== 'undefined' ? [
+    Temporal.Duration,
+    Temporal.Instant,
+    Temporal.PlainDate,
+    Temporal.PlainDateTime,
+    Temporal.PlainMonthDay,
+    Temporal.PlainTime,
+    Temporal.PlainYearMonth,
+    Temporal.ZonedDateTime,
+] : [];
+
+type TemporalValue = InstanceType<typeof temporalConstructors[number]>;
+
+export const temporalTransformers = temporalConstructors.map(cls => transformer({
+    cls,
+    // This produces a type like "Temporal.Duration". It's kinda long, true, but it is explicit and unambiguous.
+    type: `Temporal.${cls.name}`,
+    serialize: (value: TemporalValue) => value.toJSON(),
+    deserialize: value => cls.from(value),
+}));
 
 const regexpTransformer = transformer({
     cls: RegExp,
@@ -219,12 +236,8 @@ const regexpTransformer = transformer({
 const urlTransformer = transformer({
     cls: URL,
     type: 'URL',
-    serialize: value => {
-        return value.toString();
-    },
-    deserialize: value => {
-        return new URL(value);
-    },
+    serialize: value => value.toString(),
+    deserialize: value => new URL(value),
 });
 
 // The ES2026 standard defines these specialization of errors:
@@ -319,17 +332,6 @@ const nativeErrorConstructors = [
 ];
 const nativeErrorConstructorsByName = new Map(nativeErrorConstructors.map(constructor => [ constructor.name, constructor ]));
 
-export const baseTransformers = [
-    plainObjectTransformer,
-    arrayTransformer,
-    setTransformer,
-    mapTransformer,
-    dateTransformer,
-    regexpTransformer,
-    urlTransformer,
-    errorTransformer,
-];
-
 const typedArrayConstructors = [
     Int8Array,
     Uint8Array,
@@ -350,7 +352,7 @@ type TypedArray = InstanceType<typeof typedArrayConstructors[number]>;
 
 const BASE64_ALPHABET = 'base64url';
 
-export const typedArrayTransformers = typedArrayConstructors.map(cls => transformer({
+const typedArrayTransformers = typedArrayConstructors.map(cls => transformer({
     cls,
     type: cls.name,
     serialize: (value: TypedArray) => {
@@ -367,5 +369,18 @@ export const typedArrayTransformers = typedArrayConstructors.map(cls => transfor
         return new cls(bytes.buffer, bytes.byteOffset, bytes.byteLength / cls.BYTES_PER_ELEMENT);
     },
 }));
+
+export const baseTransformers = [
+    plainObjectTransformer,
+    arrayTransformer,
+    setTransformer,
+    mapTransformer,
+    dateTransformer,
+    ...temporalTransformers,
+    regexpTransformer,
+    urlTransformer,
+    errorTransformer,
+    ...typedArrayTransformers,
+];
 
 // #endregion
