@@ -1,5 +1,5 @@
-import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type SerializedValue, type TypeId } from './json.ts';
-import { isPlainObject, serializeNumber, validateObjectKeyForPrototypePollution, type ObjectLike, type PlainObject } from './transformers.ts';
+import { BIGINT_ANNOTATION, ESCAPE_CHAR, escapeKey, NUMBER_ANNOTATION, SYMBOL_ANNOTATION, UNDEFINED_ANNOTATION, WRAPPED_DIRECTIVE, WRAPPED_KEY, type AnnotatedJsonObject, type Annotations, type CompositeAnnotation, type EntityId, type JsonArray, type JsonMap, type JsonValue, type RootAnnotations, type SerializedValue, type TypeId, type WrappedAnnotations } from './json.ts';
+import { serializeNumber, validateObjectKeyForPrototypePollution, type ObjectLike, type PlainObject } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
 /**
@@ -18,20 +18,31 @@ export abstract class Serializer {
     serialize(input: unknown): SerializedValue {
         const rootAnnotations = this.annotations;
 
-        let serialized = this.serializeUnknown(input);
+        let unwrapped = this.serializeUnknown(input);
 
         this.finalizeAnnotations();
 
         let output: SerializedValue;
-        let annotations: SerializedValue[typeof ESCAPE_CHAR];
+        let annotations: RootAnnotations | WrappedAnnotations | undefined;
 
+        // We don't want to wrap the output unless necessary.
+        // The rule is that we have to store the algorithm version and the annotations somewhere. We also want the output to be reasonably consistent.
+        // So, the idea is this:
+        // - The most common use case is fetching an entity or a list of entities from an API. I.e., a plain object or an array of plain objects. We want to make these as simple as possible.
+        // - If the root value is an object, we can store the version in it.
+        // - If the root value is an array, we can store the version in its first element, provided it's an object.
+        //     - If the array is empty, we technically don't have to store the version because it's trivial to deserialize. But we wrap it anyway for consistency.
+        // - In all other cases, we have to wrap the output in a wrapper object.
+
+        const rootValue = (Array.isArray(unwrapped) && unwrapped.length > 0) ? unwrapped[0] : unwrapped;
         let isRootKeyInAnnotations = ROOT_KEY in rootAnnotations;
-        if (isRootKeyInAnnotations || !isPlainObject(serialized)) {
+
+        if (isRootKeyInAnnotations || typeof rootValue !== 'object' || rootValue === null || Array.isArray(rootValue)) {
             // We have to wrap the serialized value in a wrapper object.
-            if (serialized === undefined) {
+            if (unwrapped === undefined) {
                 // This is a very strange edge case that shouldn't really happen unless someone tries to serialize sth like function or creates a custom transformer that returns `undefined` for the root value.
                 // Let's just serialize it as `undefined` and move on. We only add the undefined annotation if needed tho.
-                serialized = null;
+                unwrapped = null;
                 rootAnnotations[ROOT_KEY] = rootAnnotations[ROOT_KEY] ?? UNDEFINED_ANNOTATION;
                 isRootKeyInAnnotations = true;
             }
@@ -45,17 +56,18 @@ export abstract class Serializer {
                 annotations[WRAPPED_KEY] = rootAnnotations[ROOT_KEY];
 
             output = {
-                [WRAPPED_KEY]: serialized,
+                [WRAPPED_KEY]: unwrapped,
                 [ESCAPE_CHAR]: annotations,
             };
         }
         else {
             // No wrapping needed - let's just make sure the root annotations exists so that we can add the algorithm version to it.
-            output = serialized as SerializedValue;
-            annotations = output[ESCAPE_CHAR];
+            output = unwrapped as SerializedValue;
+
+            annotations = rootValue[ESCAPE_CHAR] as RootAnnotations | undefined;
             if (annotations === undefined) {
                 annotations = {} as RootAnnotations;
-                output[ESCAPE_CHAR] = annotations;
+                rootValue[ESCAPE_CHAR] = annotations;
             }
         }
 
@@ -298,7 +310,7 @@ export abstract class Serializer {
 }
 
 export function isAnnotationsNotEmpty(annotations: Annotations): boolean {
-    // We want to check if the escape key is empty. This should be faster than Object.keys(...).length === 0 because the first operation has to first create an array of all keys.
+    // We want to check if the escape key is empty. This should be faster than Object.keys(...).length === 0 because that must create an array of all keys first.
     for (const _ in annotations)
         return true;
 

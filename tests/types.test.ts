@@ -305,6 +305,41 @@ describe('special objects', () => {
     });
 });
 
+describe('root arrays', () => {
+    test('array with first object is not wrapped', () => {
+        const input = [ {
+            a: 1,
+            b: NaN,
+        }, {
+            c: 3,
+        } ];
+
+        tester.serializeDeserialize(input, [ {
+            a: 1,
+            b: 'NaN',
+            $: { b: 'number' },
+        }, {
+            c: 3,
+        } ]);
+    });
+
+    test('array with first primitive is wrapped', () => {
+        const input = [ 1, { b: 2 } ];
+        tester.serializeDeserialize(input, wrap([ 1, { b: 2 } ]));
+    });
+
+    test('array with annotation is wrapped', () => {
+        const input = [ { a: 1 }, NaN ];
+        const annotations = { 2: 'number' };
+        tester.serializeDeserialize(input, wrap([ { a: 1 }, 'NaN' ], annotations));
+    });
+
+    test('empty array is wrapped', () => {
+        const input: unknown[] = [];
+        tester.serializeDeserialize(input, wrap([]));
+    });
+});
+
 describe('typed arrays', () => {
     test.each([
         [ new Uint8Array([]), '' ],

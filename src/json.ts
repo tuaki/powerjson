@@ -15,22 +15,30 @@ export type CompositeAnnotation = Record<number, Annotation>;
 
 /** The wrapped directive can be only on the root. No need to check for it elsewhere. */
 export type Annotations = Record<string, Annotation | CompositeAnnotation>;
-export type RootAnnotations = Annotations & { [ESCAPE_CHAR]: AlgorithmVersion };
-
-export type AnnotatedJsonObject = JsonObject & { [ESCAPE_CHAR]?: Annotations };
-type RootJsonObject = JsonObject & { [ESCAPE_CHAR]: RootAnnotations };
-type WrappedJsonValue = {
-    [WRAPPED_KEY]: JsonValue;
-    [ESCAPE_CHAR]: {
-        [WRAPPED_KEY]?: Annotations[string];
-        [ESCAPE_CHAR]: AlgorithmVersion;
-        [WRAPPED_DIRECTIVE]: true;
-    };
+export type RootAnnotations = Annotations & {
+    [ESCAPE_CHAR]: AlgorithmVersion;
+};
+export type WrappedAnnotations = {
+    [WRAPPED_KEY]?: Annotations[string];
+    [ESCAPE_CHAR]: AlgorithmVersion;
+    [WRAPPED_DIRECTIVE]: true;
 };
 
-export type SerializedValue = RootJsonObject | WrappedJsonValue;
+export type AnnotatedJsonObject = JsonObject & {
+    [ESCAPE_CHAR]?: Annotations;
+};
+type RootJsonObject = JsonObject & {
+    [ESCAPE_CHAR]: RootAnnotations;
+};
+type RootJsonArray = [RootJsonObject, ...JsonValue[]];
+type WrappedJsonValue = {
+    [WRAPPED_KEY]: JsonValue;
+    [ESCAPE_CHAR]: WrappedAnnotations;
+};
 
-/** For efficient escaping, this has to be a single character. */
+export type SerializedValue = RootJsonObject | RootJsonArray | WrappedJsonValue;
+
+/** For efficient escaping, this must be a single character. */
 export const ESCAPE_CHAR = '$';
 
 /**
@@ -68,8 +76,8 @@ const escapeKeyCache = Array.from({ length: 10 }, (_, i) => ESCAPE_CHAR.repeat(i
 // Yes, the 0th and 1st elements are undefined. But we don't want to use them, because escaped keys must have length greater than 1.
 const unescapeKeyCache = Array.from({ length: 10 }, (_, i) => escapeKeyCache[i - 2]);
 
-export const WRAPPED_KEY = 'w';
-export const WRAPPED_DIRECTIVE = 'wrapped';
+export const WRAPPED_KEY = 'v';
+export const WRAPPED_DIRECTIVE = 'w';
 
 export const REFERENCE_ANNOTATION: TypeId = 'ref';
 export const UNDEFINED_ANNOTATION: TypeId = 'undefined';

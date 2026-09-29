@@ -1,17 +1,19 @@
 import { expect } from 'bun:test';
 import { PowerJson } from '../src/powerJson.ts';
-import type { Annotations, JsonObject, JsonValue, RootAnnotations } from '../src/json.ts';
+import type { Annotations, JsonObject, JsonValue, RootAnnotations, SerializedValue } from '../src/json.ts';
 import type { PowerJsonOptions } from '../src/config.ts';
 
 export function wrap(value: JsonValue, annotation?: Annotations[string]): JsonObject {
     return {
-        w: value,
+        v: value,
         $: {
-            ...(annotation === undefined ? {} : { w: annotation }),
-            wrapped: true,
+            ...(annotation === undefined ? {} : { v: annotation }),
+            w: true,
         },
     };
 }
+
+type SerializedWithoutVersion = JsonObject | [JsonObject, ...JsonValue[]];
 
 export class Tester {
     private serializers: PowerJson[];
@@ -37,27 +39,32 @@ export class Tester {
         ]);
     }
 
-    static addVersionToSerialized(serializer: PowerJson, serialized: JsonObject): JsonObject {
+    static addVersionToSerialized(serializer: PowerJson, serialized: SerializedWithoutVersion): SerializedValue {
         const version = serializer.config.version;
+        const isArray = Array.isArray(serialized);
 
-        return {
-            ...serialized,
+        let rootObject = isArray ? serialized[0] : serialized;
+
+        rootObject = {
+            ...rootObject,
             $: {
-                ...(serialized.$ as RootAnnotations | undefined ?? {}),
+                ...(rootObject.$ as RootAnnotations | undefined ?? {}),
                 $: version,
             },
         };
+
+        return (isArray ? [ rootObject, ...serialized.slice(1) ] : rootObject) as SerializedValue;
     }
 
-    serializeCallback(input: unknown, callback: (serialized: JsonObject, serializer: PowerJson) => void) {
+    serializeCallback(input: unknown, callback: (serialized: SerializedValue, serializer: PowerJson) => void) {
         for (const serializer of this.serializers) {
             const serialized = this.testSerialize(serializer, input, undefined);
             callback(serialized, serializer);
         }
     }
 
-    serialize<TInput = unknown>(input: TInput, ...expectedSerialized: (JsonObject | undefined)[]): JsonObject[] {
-        const allSerialized: JsonObject[] = [];
+    serialize<TInput = unknown>(input: TInput, ...expectedSerialized: (SerializedWithoutVersion | undefined)[]): SerializedValue[] {
+        const allSerialized: SerializedValue[] = [];
 
         let i = 0;
         for (const serializer of this.serializers) {
@@ -69,7 +76,7 @@ export class Tester {
         return allSerialized;
     }
 
-    serializeDeserialize<TInput = unknown>(input: TInput, ...expectedSerialized: (JsonObject | undefined)[]): TInput[] {
+    serializeDeserialize<TInput = unknown>(input: TInput, ...expectedSerialized: (SerializedWithoutVersion | undefined)[]): TInput[] {
         const outputs: TInput[] = [];
 
         let i = 0;
@@ -82,7 +89,7 @@ export class Tester {
         return outputs;
     }
 
-    private testSerialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: JsonObject | undefined): JsonObject {
+    private testSerialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: SerializedWithoutVersion | undefined): SerializedValue {
         // Make sure the input is not mutated during serialization.
         deepFreeze(input);
 
@@ -92,10 +99,10 @@ export class Tester {
             expect(serialized).toStrictEqual(expected);
         }
 
-        return serialized;
+        return serialized as SerializedValue;
     }
 
-    private testSerializeDeserialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: JsonObject | undefined, reverseJsonOrder: boolean): TInput {
+    private testSerializeDeserialize<TInput>(serializer: PowerJson, input: TInput, expectedSerialized: SerializedWithoutVersion | undefined, reverseJsonOrder: boolean): TInput {
         let serialized = this.testSerialize(serializer, input, expectedSerialized);
         if (reverseJsonOrder)
             serialized = reverseObjectKeys(serialized);
@@ -105,14 +112,14 @@ export class Tester {
         // Again, no changes during deserialization.
         deepFreeze(parsed);
 
-        const output = serializer.deserialize(parsed);
+        const output = serializer.deserialize<TInput>(parsed);
         this.checker.checkOutput(input, output);
 
         if (serializer.config.deduplicate)
             testIdentityEqualities(input, output);
         // NICE_TO_HAVE else check the identities but only for circular references ?.
 
-        return output as TInput;
+        return output;
     }
 
     forEach(callback: (serializer: PowerJson) => void) {

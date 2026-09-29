@@ -39,6 +39,8 @@ In both modes, a reference is expressed as a number with `ref` type annotation. 
 - Simple: the number is an index in the path from root to the referenced object. The path consists of *deserialized* objects (i.e., `Map` is counted as one object, even though it is serialized to a 2D array).
 - Deduplication: the number is an entity identifier, which is a unique number assigned to each object during serialization. The root object has entity identifier `0`, and each new object gets the next number. If an object (except for the root) is referenced, its entity identifier must be explicitly stored in its annotation.
 
+In both modes, if the value is [wrapped](#wrapping), the wrapper object is not the root of the path, but the wrapped value is. So, the wrapped value has index/identifier `0`.
+
 ## Object key order
 
 JS has a [well-defined order](https://tc39.es/ecma262/multipage/ordinary-and-exotic-objects-behaviours.html#sec-ordinaryownpropertykeys) of object keys, which mostly depends on the order in which the keys were added to the object. On the contrary, in JSON, object is an unordered collection of key-value pairs. Therefore, PowerJson does not guarantee that the deserialized objects will have the same key order as the original objects (arrays, sets, and maps *do* guarantee the order of their elements because they are serialized as arrays).
@@ -122,17 +124,27 @@ PowerJson uses different serialization algorithms for different configurations. 
 }
 ```
 
+If the root object is an array, the version number is in the `$.$` property of its first element.
+
 ### Wrapping
 
-Primitive values, arrays, and custom classes need to be wrapped to a plain object in order to store their annotations. For example, the `NaN` value is serialized as:
+Some values need to be wrapped in order to store their annotations and the algorithm version. If the root value requires an annotation (e.g., a `CustomClass` instance with a registered transformer, or an array of such instances), it will be wrapped. If not, wrapping depends on the value type:
+
+- An object - not wrapped.
+- An array whose first element is an object - not wrapped.
+- Everything else - wrapped.
+
+The point of these rules is to avoid wrapping in the most common use case - sending a result object, an entity, or an array of such over an API - while keeping the rules as simple and predictable as possible. For example, we could have decided not to wrap primitive values, but that would make some numbers not wrapped and others wrapped (e.g., `69` vs `NaN`).
+
+All values are wrapped in the same way - the `v` property contains the value, `$.v` contains the annotation (if any), and `$.w` is set to `true`. E.g., the `NaN` value is serialized as:
 
 ```ts
 {
-    w: 'NaN',
+    v: 'NaN',
     $: {
-        w: 'number',
+        v: 'number',
+        w: true,
         $: 1,
-        wrapped: true,
     },
 }
 ```

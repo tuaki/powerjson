@@ -288,7 +288,7 @@ const errorTransformer = transformer({
 
         deserializer.deserializePlainObject(rest, error);
 
-        // `cause` is a non-enumerable property. Normally, we would pass it through the constructor, but we can't do that because we have to deserialize it first, and for that, the error has to be already instantiated and registered as a reference target.
+        // `cause` is a non-enumerable property. Normally, we would pass it through the constructor, but we can't do that because we have to deserialize it first, and for that, the error must be already instantiated and registered as a reference target.
         // Also, `undefined` vs "not defined" strikes again.
         if ('cause' in error) {
             Object.defineProperty(error, 'cause', {

@@ -1,4 +1,4 @@
-import type { JsonObject } from './json.ts';
+import type { SerializedValue } from './json.ts';
 import { PowerJsonConfig, type PowerJsonOptions } from './config.ts';
 import { serialize, deserialize } from './algorithms.ts';
 
@@ -14,12 +14,12 @@ export class PowerJson {
         this.config = new PowerJsonConfig(options);
     }
 
-    serialize(input: unknown): JsonObject {
+    serialize(input: unknown): SerializedValue {
         return serialize(input, this.config);
     }
 
-    deserialize<T = unknown>(jsonObject: JsonObject): T {
-        return deserialize<T>(jsonObject, this.config);
+    deserialize<T = unknown>(serialized: SerializedValue): T {
+        return deserialize<T>(serialized, this.config);
     }
 
     stringify(input: unknown): string {
@@ -27,7 +27,7 @@ export class PowerJson {
     }
 
     parse<T = unknown>(jsonString: string): T {
-        return this.deserialize(JSON.parse(jsonString)) as T;
+        return this.deserialize<T>(JSON.parse(jsonString));
     }
 
     private static defaultInstance = new PowerJson();

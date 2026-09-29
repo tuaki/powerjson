@@ -8,14 +8,14 @@ const ROOT_ENTITY_ID = 0;
 export class DeduplicatedDeserializer extends Deserializer {
     private sortObjectKeys!: SortObjectKeysOption;
 
-    protected override deserializeUnwrapped(serialized: JsonValue) {
+    protected override deserializeUnwrapped(unwrapped: JsonValue) {
         this.sortObjectKeys = this.config.sortObjectKeys;
 
         if (this.sortObjectKeys === 'catch') {
             const rootAnnotation = this.annotation;
 
             try {
-                return this.deserializeValue(serialized);
+                return this.deserializeValue(unwrapped);
             }
             catch (error) {
                 if (error !== expectedReferenceError)
@@ -34,9 +34,9 @@ export class DeduplicatedDeserializer extends Deserializer {
         }
 
         if (this.sortObjectKeys === 'always')
-            serialized = checkOrSortObjectKeys(serialized);
+            unwrapped = checkOrSortObjectKeys(unwrapped);
 
-        return this.deserializeValue(serialized);
+        return this.deserializeValue(unwrapped);
     }
 
     // #region Annotations

@@ -116,7 +116,7 @@ export class PowerJsonConfig {
             transformer = this.transformersByPrototype.get(prototype);
         }
 
-        // The previous search should never fail because a prototype chain has to end in `null`, and we have a transformer for `null` (the plain object transformer).
+        // The previous search should never fail because a prototype chain must end in `null`, and we have a transformer for `null` (the plain object transformer).
         return transformer;
     }
 

@@ -2,8 +2,9 @@ import { BIGINT_ANNOTATION, ESCAPE_CHAR, NUMBER_ANNOTATION, REFERENCE_ANNOTATION
 import { deserializeNumber, validateObjectKeyForPrototypePollution, type ObjectLike, type PlainObject, type Primitive } from './transformers.ts';
 import type { PowerJsonConfig } from './config.ts';
 
-export function getAlgorithmVersion(jsonObject: SerializedValue): AlgorithmVersion {
-    return jsonObject[ESCAPE_CHAR][ESCAPE_CHAR];
+export function getAlgorithmVersion(serialized: SerializedValue): AlgorithmVersion {
+    const rootObject = Array.isArray(serialized) ? serialized[0] : serialized;
+    return rootObject[ESCAPE_CHAR][ESCAPE_CHAR];
 }
 
 export abstract class Deserializer {
@@ -13,24 +14,24 @@ export abstract class Deserializer {
         this.config = config;
     }
 
-    deserialize(jsonObject: SerializedValue): unknown {
-        let serialized: JsonValue;
+    deserialize(serialized: SerializedValue): unknown {
+        let unwrapped: JsonValue;
 
-        const annotations = jsonObject[ESCAPE_CHAR];
         // There is only one way for a non-escape key to be in annotations and not in the object - if the object is wrapped.
-        const isWrapped = annotations[WRAPPED_DIRECTIVE] === true && !(WRAPPED_DIRECTIVE in jsonObject);
+        const isArray = Array.isArray(serialized);
+        const isWrapped = !isArray && serialized[ESCAPE_CHAR][WRAPPED_DIRECTIVE] === true && !(WRAPPED_DIRECTIVE in serialized);
         if (isWrapped) {
-            this.annotation = annotations[WRAPPED_KEY];
-            serialized = jsonObject[WRAPPED_KEY];
+            this.annotation = serialized[ESCAPE_CHAR][WRAPPED_KEY];
+            unwrapped = serialized[WRAPPED_KEY];
         }
         else {
-            serialized = jsonObject;
+            unwrapped = serialized;
         }
 
-        return this.deserializeUnwrapped(serialized);
+        return this.deserializeUnwrapped(unwrapped);
     }
 
-    protected abstract deserializeUnwrapped(serialized: JsonValue): unknown;
+    protected abstract deserializeUnwrapped(unwrapped: JsonValue): unknown;
 
     // #region Context
 

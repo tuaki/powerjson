@@ -1,4 +1,4 @@
-import type { JsonObject, SerializedValue } from './json.ts';
+import type { SerializedValue } from './json.ts';
 import type { PowerJsonConfig } from './config.ts';
 import type { Serializer } from './serializer.ts';
 import { SimpleSerializer } from './simpleSerializer.ts';
@@ -7,9 +7,7 @@ import { type Deserializer, getAlgorithmVersion } from './deserializer.ts';
 import { SimpleDeserializer } from './simpleDeserializer.ts';
 import { DeduplicatedDeserializer } from './deduplicatedDeserializer.ts';
 
-// This actually returny SerializedValue, but we don't want to expose that type to the public API.
-// So, a generic JsonObject is used instead.
-export function serialize(input: unknown, config: PowerJsonConfig): JsonObject {
+export function serialize(input: unknown, config: PowerJsonConfig): SerializedValue {
     let serializer: Serializer | undefined;
 
     switch (config.version) {
@@ -24,9 +22,7 @@ export function serialize(input: unknown, config: PowerJsonConfig): JsonObject {
     return serializer.serialize(input);
 }
 
-export function deserialize<TOutput = unknown>(jsonValue: JsonObject, config: PowerJsonConfig): TOutput {
-    const serialized = jsonValue as SerializedValue;
-
+export function deserialize<TOutput = unknown>(serialized: SerializedValue, config: PowerJsonConfig): TOutput {
     let deserializer: Deserializer | undefined;
 
     switch (getAlgorithmVersion(serialized)) {

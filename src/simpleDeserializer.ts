@@ -3,8 +3,8 @@ import type { Annotation, EntityId, JsonValue, TypeId } from './json.ts';
 import type { ObjectLike } from './transformers.ts';
 
 export class SimpleDeserializer extends Deserializer {
-    protected override deserializeUnwrapped(serialized: JsonValue) {
-        return this.deserializeValue(serialized);
+    protected override deserializeUnwrapped(unwrapped: JsonValue) {
+        return this.deserializeValue(unwrapped);
     }
 
     // #region Annotations
