@@ -72,9 +72,11 @@ The default `PowerJson` instance is immutable; you are supposed to create a new 
 const powerJson = new PowerJson({ deduplicate: true });
 ```
 
+All configuration options are listed [here](./src/config.ts).
+
 ## Supported types
 
-These types are supported by PowerJson (so far). More types will be added as they become part of the standard JavaScript API (e.g., `Temporal`).
+These types are supported by PowerJson (so far). More types will be added as they become part of the standard JavaScript API.
 
 | type                                                                                       | supported by standard JSON? | supported by PowerJson? |
 | ------------------------------------------------------------------------------------------ | --------------------------- | ----------------------- |
@@ -101,18 +103,17 @@ These types are supported by PowerJson (so far). More types will be added as the
 
 ### Custom classes
 
-Any object with an unsupported type will be serialized as a plain JS object. You can change that by registering a custom transformer for your class. For example, transformer for Luxon's `DateTime` might look like this:
+Any object with an unsupported type will be serialized as a plain JS object. You can change that by registering a custom transformer for your class. For example, transformer for [Luxon](https://github.com/moment/luxon)'s `DateTime` might look like this:
 
 ```ts
 import { PowerJson, transformer } from 'powerjson';
+import { DateTime } from 'luxon';
 
 const dateTimeTransformer = transformer({
     cls: DateTime,
     type: 'DateTime',
     serialize: value => value.toISO()!,
     deserialize: value => DateTime.fromISO(value, { setZone: true }),
-    isEntity: false,    // Referential equalities won't be preserved for this type.
-    isComposite: false, // The type won't be serialized to an array.
 });
 
 // Use the same PowerJson instance everywhere in your codebase.

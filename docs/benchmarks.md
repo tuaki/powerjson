@@ -48,7 +48,7 @@ Benchmark inputs are deterministic through the seed and reference date in `bench
 | -------------------- | ------- |
 | bun                  | 1.4.0   |
 | node                 | 26.8.2  |
-| powerjson            | 1.2.1   |
+| powerjson            | 1.2.2   |
 | superjson            | 2.2.6   |
 | devalue              | 5.9.1   |
 | next-json            | 0.5.1   |

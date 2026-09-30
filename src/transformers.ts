@@ -47,12 +47,23 @@ export type Primitive = undefined | null | string | number | boolean | bigint | 
  */
 export type ObjectLike = object;
 
-export type Transformer<TObject extends ObjectLike = ObjectLike, TJson extends JsonValue = JsonValue> = {
+export type Transformer<
+    TObject extends ObjectLike = ObjectLike,
+    TJson extends JsonValue = JsonValue,
+> = Required<TransformerOptions<TObject, TJson>>;
+
+type TransformerOptions<TObject extends ObjectLike, TJson extends JsonValue> = {
+    /**
+     * Class to which this transformer applies. Also applies to all its subclasses (unless they have their own transformer).
+     */
     cls: Class<TObject>;
+    /**
+     * String identifier to be used in the annotation. Should not be `undefined` (except for plain objects and arrays).
+     */
     type: TypeId | undefined;
     /**
      * Serializes the value to a JSON value.
-     * If undefined is returned, the value will be skipped from objects, sets, and maps. However, it will be kept in arrays as `null` to preserve indexes.
+     * If `undefined` is returned, the value will be skipped from objects, sets, and maps. However, it will be kept in arrays as `null` to preserve indexes.
      * Try `JSON.stringify({ a: undefined })` and `JSON.stringify([ undefined ])` to see the difference.
      */
     serialize(value: TObject, serializer: Serializer): TJson | undefined;
@@ -62,18 +73,21 @@ export type Transformer<TObject extends ObjectLike = ObjectLike, TJson extends J
     deserialize(value: TJson, deserializer: Deserializer): TObject;
     /**
      * Entities are subject to deduplication and circular reference detection. Values are not.
+     * @default false
      */
-    isEntity: boolean;
+    isEntity?: boolean;
     /**
      * Composite types are serialized as arrays and share one composite annotation. Non-composite types are serialized as objects (and have their own annotations) or primitives.
+     * @default false
      */
-    isComposite: boolean;
+    isComposite?: boolean;
     /**
      * If `true` and the object has a `toJSON` method, it will be called and the result will be serialized instead of the object itself.
      * If the `toJSON` output also has a `toJSON` method, it won't be called again (this is consistent with `JSON.stringify` behavior). However, if it's an object, a new transformer will be searched for.
      * This option is here mainly for the `Object` and `Array` transformers to mimic the default "plain object" behavior. Also note that if `toJSON` is called, the type information of the original object is lost. So, if a custom class already implements a transformer, it should use its `serialize` method directly instead of relying on `toJSON`.
+     * @default false
      */
-    useToJSON: boolean;
+    useToJSON?: boolean;
 };
 
 type Class<T> = {
@@ -89,15 +103,7 @@ type Class<T> = {
  * Utility function for defining transformers.
  * Automatically infers the types of `TObject` and `TJson` from the provided functions.
  */
-export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(options: {
-    cls: Class<TObject>;
-    type: TypeId | undefined;
-    serialize: (value: TObject, serializer: Serializer) => TJson | undefined;
-    deserialize: (value: TJson, deserializer: Deserializer) => TObject;
-    isEntity?: boolean;
-    isComposite?: boolean;
-    useToJSON?: boolean;
-}): Transformer<TObject, TJson> {
+export function transformer<TObject extends ObjectLike, TJson extends JsonValue>(options: TransformerOptions<TObject, TJson>): Transformer<TObject, TJson> {
     return {
         isEntity: false,
         isComposite: false,
@@ -370,7 +376,7 @@ const typedArrayTransformers = typedArrayConstructors.map(cls => transformer({
     },
 }));
 
-export const baseTransformers = [
+export const defaultTransformers = [
     plainObjectTransformer,
     arrayTransformer,
     setTransformer,

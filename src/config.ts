@@ -1,5 +1,5 @@
 import type { AlgorithmVersion, TypeId } from './json.ts';
-import { baseTransformers, type ObjectLike, type Transformer } from './transformers.ts';
+import { defaultTransformers, type ObjectLike, type Transformer } from './transformers.ts';
 
 export type PowerJsonOptions = {
     /**
@@ -8,6 +8,8 @@ export type PowerJsonOptions = {
      */
     space?: string | number;
     /**
+     * If true, referentially equal entities (see {@link Transformer#isEntity}) will be stored and deserialized only once.
+     * Use it to make the serialized JSON smaller and to preserve referential equality. However, cases with very few referentially equal entities will be slower.
      * @default false
      */
     deduplicate?: boolean;
@@ -21,10 +23,16 @@ export type PowerJsonOptions = {
      * @default false
      */
     allowStackInError?: boolean;
+    /**
+     * Transformers for custom classes.
+     * They can override the {@link defaultTransformers} or add new ones.
+     * @default []
+     */
     transformers?: Transformer[];
     /**
-     * For each symbol, provide either symbol-ID pair, or just the symbol.
+     * For each symbol, provide either symbol-ID pair or just the symbol.
      * In the latter case, the symbol's description will be used as the ID. If the description is undefined, an error will be thrown.
+     * @default []
      */
     symbols?: (symbol | [symbol, string])[];
 };
@@ -66,7 +74,7 @@ export class PowerJsonConfig {
         this.allowStackInError = allowStackInError;
 
         [
-            ...baseTransformers,
+            ...defaultTransformers,
             ...transformers,
         ].forEach(transformer => this.registerTransformer(transformer));
 
