@@ -5,8 +5,9 @@ node_modules
 .bun
 
 # production
-dist
+/dist
 
 /temp
+/data
 
 *.cpuprofile

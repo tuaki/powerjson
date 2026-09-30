@@ -1,6 +1,16 @@
 import type { ScenarioResult, SerializerResult } from './measure.ts';
 import { formatBestStat, renderRelativeCell, type Formatter } from './format.ts';
-import { selectUnit, type Stat, type Unit, type UnitType } from './utils.ts';
+import { getRuntime, getRunTimestamp, selectUnit, type Stat, type Unit, type UnitType } from './utils.ts';
+import { OUTPUT_PATH } from './config.ts';
+import { stringify } from 'csv-stringify/sync';
+import path from 'node:path';
+import fs from 'node:fs';
+
+export type ComparisonGroup = {
+    serializers: string[];
+    metrics: ComparisonMetric[];
+    formatter: Formatter;
+};
 
 export type ComparisonMetric = {
     id: string;
@@ -10,38 +20,30 @@ export type ComparisonMetric = {
     value: (result: SerializerResult) => Stat;
 };
 
-export type ComparisonGroup = {
-    serializers: string[];
-    metrics: ComparisonMetric[];
-    label?: string;
-    formatter: Formatter;
-};
-
 export function printComparisonTables(results: ScenarioResult[], groups: ComparisonGroup[]) {
     for (const group of groups)
         printComparisonTable(results, group);
 }
 
 function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup) {
-    const { metrics } = group;
+    const { serializers, metrics, formatter } = group;
     if (group.serializers.length === 0 || metrics.length === 0)
         return;
 
-    const unitsByMetric = selectUnitsByMetric(results, group.serializers, metrics);
+    const unitsByMetric = selectUnitsByMetric(results, serializers, metrics);
 
     const columns = [ 'scenario' ];
-    for (let metricIndex = 0; metricIndex < metrics.length; metricIndex++) {
-        const metric = metrics[metricIndex]!;
+    for (const metric of metrics) {
         const unit = unitsByMetric.get(metric.id)!;
         columns.push(`Best (${unit.label})`);
-        columns.push(...group.serializers);
+        columns.push(...serializers);
     }
 
     const rows = results.map(result => {
         const bySerializer = new Map(result.results.map(serializerResult => [ serializerResult.serializer, serializerResult ]));
         const row = [ result.scenario.name ];
 
-        const bestComparedByMetric = new Map(metrics.map(metric => [ metric.id, findMetricBestForSerializers(result.results, metric, group.serializers) ]));
+        const bestComparedByMetric = new Map(metrics.map(metric => [ metric.id, findMetricBestForSerializers(result.results, metric, serializers) ]));
         const bestGlobalByMetric = new Map(metrics.map(metric => [ metric.id, findMetricBest(result.results, metric) ]));
 
         for (const metric of metrics) {
@@ -51,10 +53,10 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup)
 
             row.push(formatBestStat(bestCompared, unit));
 
-            for (const serializerName of group.serializers) {
-                const serializerResult = bySerializer.get(serializerName);
+            for (const serializer of serializers) {
+                const serializerResult = bySerializer.get(serializer);
                 const stat = serializerResult && metric.value(serializerResult);
-                row.push(renderRelativeCell(group.formatter, stat, unit, bestCompared, bestGlobal));
+                row.push(renderRelativeCell(formatter, stat, unit, bestCompared, bestGlobal));
             }
         }
 
@@ -63,20 +65,20 @@ function printComparisonTable(results: ScenarioResult[], group: ComparisonGroup)
 
     console.log('');
 
-    const table = group.formatter.createTable();
+    const table = formatter.createTable();
 
     table.push([
         { content: '', colSpan: 1 },
         ...metrics.map(metric => ({
             content: metric.label ?? metric.id,
-            colSpan: group.serializers.length + 1,
+            colSpan: serializers.length + 1,
         })),
     ]);
     table.push(columns);
 
     table.push(...rows);
 
-    process.stdout.write(group.formatter.table(table, 2));
+    process.stdout.write(formatter.table(table, 2));
     process.stdout.write('\n');
 }
 
@@ -116,4 +118,55 @@ function findMetricBestForSerializers(results: SerializerResult[], metric: Compa
         .filter(stat => Number.isFinite(stat.value));
 
     return stats.length > 0 ? stats.reduce((best, stat) => stat.value < best.value ? stat : best) : undefined;
+}
+
+export type ComparisonTable = {
+    serializers: string[];
+    metric: ComparisonMetric;
+};
+
+export function saveComparisonTables(results: ScenarioResult[], tables: ComparisonTable[]) {
+    for (const table of tables)
+        saveComparisonTable(results, table);
+}
+
+function saveComparisonTable(results: ScenarioResult[], table: ComparisonTable) {
+    const { serializers, metric } = table;
+
+    const header = [
+        'scenario',
+        // Time units have errors, so we add an extra column for them.
+        ...(metric.unitType === 'time' ? serializers.flatMap(serializer => [ serializer, `${serializer}_err` ]) : serializers),
+    ];
+
+    const rows = results.map(result => {
+        const bySerializer = new Map(result.results.map(serializerResult => [ serializerResult.serializer, serializerResult ]));
+        const row: (string | number)[] = [ result.scenario.name ];
+
+        for (const serializer of serializers) {
+            const serializerResult = bySerializer.get(serializer);
+            const stat = serializerResult && metric.value(serializerResult);
+            row.push(stat?.value ?? NaN);
+            if (metric.unitType === 'time')
+                row.push(stat?.error ?? NaN);
+        }
+
+        return row;
+    });
+
+    writeCsvTable(table, [ header, ...rows ]);
+}
+
+function writeCsvTable(table: ComparisonTable, csv: unknown[]) {
+    const csvString = stringify(csv);
+
+    if (!fs.existsSync(OUTPUT_PATH))
+        fs.mkdirSync(OUTPUT_PATH, { recursive: true });
+
+    const fileName = `${getRunTimestamp()}-${getRuntime()}-${table.metric.id}.csv`;
+    const filePath = path.join(OUTPUT_PATH, fileName);
+
+    fs.writeFileSync(filePath, csvString);
+
+    console.log(`Saved comparison table to ${filePath}`);
 }

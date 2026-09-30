@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildPinnedCommand } from './pin.ts';
-
-type Runtime = 'bun' | 'node';
+import { buildPinnedCommand } from './measure/pin.ts';
+import { getRuntime, type Runtime } from './measure/utils.ts';
 
 // One command per supported runtime, rather than just re-using whichever executable ran this script - that way the
 // runtime-specific flags it needs (e.g. Node's `--expose-gc`, so `forceGc()` can actually force a GC cycle) are never missed.
@@ -11,7 +10,7 @@ const RUNTIME_COMMANDS: Record<Runtime, (mainScript: string) => string[]> = {
     node: mainScript => [ 'node', '--expose-gc', mainScript ],
 };
 
-const mainScript = fileURLToPath(new URL('./main.ts', import.meta.url));
+const mainScript = fileURLToPath(new URL('./measure/main.ts', import.meta.url));
 
 const [ runtime, forwardedArgs ] = parseArgs(process.argv.slice(2));
 console.log(`Running benchmarks under ${runtime}.`);
@@ -29,9 +28,5 @@ function parseArgs(argv: string[]): [Runtime, string[]] {
     if (first === 'bun' || first === 'node')
         return [ first, rest ];
 
-    return [ defaultRuntime(), argv ];
-}
-
-function defaultRuntime(): Runtime {
-    return typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined' ? 'bun' : 'node';
+    return [ getRuntime(), argv ];
 }

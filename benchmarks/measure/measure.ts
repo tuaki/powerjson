@@ -338,4 +338,3 @@ function printScenarioResults(result: ScenarioResult, serializers: Serializer[],
     process.stdout.write(formatter.table(table));
     process.stdout.write('\n');
 }
-

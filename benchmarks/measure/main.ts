@@ -7,10 +7,10 @@ import { sharedReferencesScenario } from './scenarios/sharedReferences.ts';
 import { circularReferencesScenario } from './scenarios/circularReferences.ts';
 import { repeatedTemporalValuesScenario } from './scenarios/repeatedTemporalValues.ts';
 import { mixedExtendedTypesScenario } from './scenarios/mixedExtendedTypes.ts';
-import { printComparisonTables, type ComparisonGroup, type ComparisonMetric } from './aggregate.ts';
+import { printComparisonTables, saveComparisonTables, type ComparisonGroup, type ComparisonMetric, type ComparisonTable } from './aggregate.ts';
 import { ONLY_EXAMPLE_SCENARIO, REFERENCE_DATE } from './config.ts';
 import { devalueSerializer, jsonSerializer, nextJsonSerializer, serializeJavascriptSerializer, superJsonSerializer, powerJsonSerializer } from './serializers.ts';
-import { CliFormatter, MarkdownFormatter } from './format.ts';
+import { CliFormatter } from './format.ts';
 
 function main() {
     faker.setDefaultRefDate(REFERENCE_DATE);
@@ -20,6 +20,7 @@ function main() {
 
     const scenarioResults = runScenarios(scenarios, serializers, cliFormatter);
     printComparisonTables(scenarioResults, comparisonGroups);
+    saveComparisonTables(scenarioResults, comparisonTables);
 }
 
 function createScenarios() {
@@ -63,7 +64,7 @@ const allMetrics: ComparisonMetric[] = [ {
 } ];
 
 const cliFormatter = new CliFormatter();
-const markdownFormatter = new MarkdownFormatter();
+// const markdownFormatter = new MarkdownFormatter();
 
 const nonJsonSerializers = [ 'powerjson v1', 'powerjson v2', 'superjson v1', 'superjson v2', 'devalue', 'serialize-javascript', 'next-json' ];
 
@@ -76,29 +77,40 @@ const comparisonGroups: ComparisonGroup[] = [ {
     metrics: allMetrics,
     formatter: cliFormatter,
 }, {
+//     serializers: nonJsonSerializers,
+//     metrics: [ allMetrics[0] ],
+//     formatter: markdownFormatter,
+// }, {
+//     serializers: nonJsonSerializers,
+//     metrics: [ allMetrics[1] ],
+//     formatter: markdownFormatter,
+// }, {
+//     serializers: nonJsonSerializers,
+//     metrics: [ allMetrics[2] ],
+//     formatter: markdownFormatter,
+// }, {
     serializers: nonJsonSerializers,
     metrics: [ allMetrics[0] ],
-    formatter: markdownFormatter,
+    formatter: cliFormatter,
 }, {
     serializers: nonJsonSerializers,
     metrics: [ allMetrics[1] ],
-    formatter: markdownFormatter,
-}, {
-    serializers: nonJsonSerializers,
-    metrics: [ allMetrics[2] ],
-    formatter: markdownFormatter,
-}, {
-    serializers: nonJsonSerializers,
-    metrics: [ allMetrics[0] ],
-    formatter: cliFormatter,
-}, {
-    serializers: nonJsonSerializers,
-    metrics: [ allMetrics[1] ],
     formatter: cliFormatter,
 }, {
     serializers: nonJsonSerializers,
     metrics: [ allMetrics[2] ],
     formatter: cliFormatter,
+} ];
+
+const comparisonTables: ComparisonTable[] = [ {
+    serializers: nonJsonSerializers,
+    metric: allMetrics[0],
+}, {
+    serializers: nonJsonSerializers,
+    metric: allMetrics[1],
+}, {
+    serializers: nonJsonSerializers,
+    metric: allMetrics[2],
 } ];
 
 main();

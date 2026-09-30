@@ -1,5 +1,17 @@
 import { DISPLAY_ERROR_STACKS } from './config.ts';
 
+export type Runtime = 'bun' | 'node';
+
+export function getRuntime(): Runtime {
+    return typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined' ? 'bun' : 'node';
+}
+
+const runStart = new Date();
+
+export function getRunTimestamp(): string {
+    return runStart.toISOString().replace(/[:.]/g, '-');
+}
+
 const seenErrors = new Set<string>();
 
 export function printBenchmarkError(message: string, error: unknown, onlyUnique = false) {
@@ -199,9 +211,9 @@ const timeUnits: Unit[] = [
 
 const sizeUnits: Unit[] = [
     { label: 'B', divisor: 1 },
-    { label: 'KB', divisor: 1024 },
-    { label: 'MB', divisor: 1024 ** 2 },
-    { label: 'GB', divisor: 1024 ** 3 },
+    { label: 'KB', divisor: 1_000 },
+    { label: 'MB', divisor: 1_000 ** 2 },
+    { label: 'GB', divisor: 1_000 ** 3 },
 ].map(unit => ({
     ...unit,
     type: 'size',

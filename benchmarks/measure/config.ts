@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 export const DISPLAY_ERROR_STACKS = false;
 export const DISPLAY_VERBOSE_RESULTS = true;
 
@@ -20,3 +22,5 @@ export const RELATIVE_SPREAD_WARNING_THRESHOLD = 0.1;
 
 /** In result tables, values within this fraction of a column's/group's best are still highlighted as "close to best". */
 export const RELATIVE_CLOSE_TO_BEST_THRESHOLD = 0.05;
+
+export const OUTPUT_PATH = fileURLToPath(new URL('../../data/measured', import.meta.url));
