@@ -49,6 +49,7 @@
         "@types/serialize-javascript": "^5.0.4",
         "cli-table3": "^0.6.5",
         "csv-stringify": "^6.8.3",
+        "danson": "^0.13.1",
         "devalue": "^5.9.1",
         "eslint": "^10.6.0",
         "jiti": "^2.7.0",

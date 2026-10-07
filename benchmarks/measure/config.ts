@@ -11,7 +11,7 @@ export const ONLY_EXAMPLE_SCENARIO = false;
 
 /**
  * Use this to scale the number of iterations for each benchmark.
- * Warning: values below 1 are not guarranteed to produce reliable results. (But neither are values above 1, haha.)
+ * Warning: values below 1 are not guaranteed to produce reliable results (but neither are values above 1, haha).
  */
 export const BENCHMARK_ITERATIONS_SCALE = 1;
 

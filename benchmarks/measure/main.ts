@@ -9,7 +9,7 @@ import { repeatedTemporalValuesScenario } from './scenarios/repeatedTemporalValu
 import { mixedExtendedTypesScenario } from './scenarios/mixedExtendedTypes.ts';
 import { printComparisonTables, saveComparisonTables, type ComparisonGroup, type ComparisonMetric, type ComparisonTable } from './aggregate.ts';
 import { ONLY_EXAMPLE_SCENARIO, REFERENCE_DATE } from './config.ts';
-import { devalueSerializer, jsonSerializer, nextJsonSerializer, serializeJavascriptSerializer, superJsonSerializer, powerJsonSerializer } from './serializers.ts';
+import { jsonSerializer, powerJsonSerializer, superJsonSerializer, dansonSerializer, devalueSerializer, serializeJavascriptSerializer, nextJsonSerializer } from './serializers.ts';
 import { CliFormatter } from './format.ts';
 
 function main() {
@@ -43,6 +43,8 @@ function createSerializers() {
         powerJsonSerializer({ deduplicate: true }),
         superJsonSerializer({ deduplicate: false }),
         superJsonSerializer({ deduplicate: true }),
+        dansonSerializer({ deduplicate: false }),
+        dansonSerializer({ deduplicate: true }),
         devalueSerializer(),
         serializeJavascriptSerializer(),
         nextJsonSerializer(),
@@ -66,7 +68,7 @@ const allMetrics: ComparisonMetric[] = [ {
 const cliFormatter = new CliFormatter();
 // const markdownFormatter = new MarkdownFormatter();
 
-const nonJsonSerializers = [ 'powerjson v1', 'powerjson v2', 'superjson v1', 'superjson v2', 'devalue', 'serialize-javascript', 'next-json' ];
+const nonJsonSerializers = [ 'powerjson v1', 'powerjson v2', 'superjson v1', 'superjson v2', 'danson v1', 'danson v2', 'devalue', 'serialize-javascript', 'next-json' ];
 
 const comparisonGroups: ComparisonGroup[] = [ {
     serializers: [ 'powerjson v1', 'superjson v1' ],

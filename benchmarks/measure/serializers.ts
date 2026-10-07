@@ -1,9 +1,10 @@
+import { createSerializer } from './utils.ts';
 import { PowerJson } from '../../src/powerJson.ts';
 import SuperJson from 'superjson';
+import * as danson from 'danson';
 import * as devalue from 'devalue';
 import serializeJavascript from 'serialize-javascript';
 import { NJSON } from 'next-json';
-import { createSerializer } from './utils.ts';
 
 export function jsonSerializer() {
     return createSerializer('JSON', {
@@ -12,7 +13,7 @@ export function jsonSerializer() {
     });
 }
 
-export function powerJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
+export function powerJsonSerializer({ deduplicate }: { deduplicate: boolean }) {
     const name = `powerjson v${deduplicate ? '2' : '1'}`;
     const powerJson = new PowerJson({ deduplicate });
 
@@ -26,7 +27,7 @@ export function powerJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
     });
 }
 
-export function superJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
+export function superJsonSerializer({ deduplicate }: { deduplicate: boolean }) {
     // https://github.com/ravionhq/superjson
     const name = `superjson v${deduplicate ? '2' : '1'}`;
     const superJson = new SuperJson({ dedupe: deduplicate });
@@ -36,6 +37,28 @@ export function superJsonSerializer({ deduplicate }:{ deduplicate: boolean }) {
         parse: json => superJson.parse(json),
         serialize: value => superJson.serialize(value),
         deserialize: serialized => superJson.deserialize(serialized, { inPlace: true }),
+        toJson: serialized => JSON.stringify(serialized),
+        fromJson: json => JSON.parse(json),
+    });
+}
+
+export function dansonSerializer({ deduplicate }: { deduplicate: boolean }) {
+    // https://github.com/KATT/danson
+    const name = `danson v${deduplicate ? '2' : '1'}`;
+
+    const serializeOptions = {
+        dedupe: deduplicate,
+        serializers: { ...danson.std.serializers },
+    };
+    const deserializeOptions = {
+        deserializers: { ...danson.std.deserializers },
+    };
+
+    return createSerializer(name, {
+        stringify: value => danson.stringifySync(value, serializeOptions),
+        parse: json => danson.parseSync(json, deserializeOptions),
+        serialize: value => danson.serializeSync(value, serializeOptions),
+        deserialize: serialized => danson.deserializeSync(serialized, deserializeOptions),
         toJson: serialized => JSON.stringify(serialized),
         fromJson: json => JSON.parse(json),
     });

@@ -1,3 +1,4 @@
+from math import ceil
 from pathlib import Path
 from typing import cast
 from matplotlib.axes import Axes
@@ -15,8 +16,10 @@ SERIALIZER_COLORS = {
     'powerjson v2': '#1b9c85',
     'superjson v1': '#ffb3ba',
     'superjson v2': '#e63950',
+    'danson v1': '#ffe1bd',
+    'danson v2': '#ffb067',
     'devalue': '#bdb2ff',
-    'serialize-javascript': '#ffd8a8',
+    'serialize-javascript': '#fff1a8',
     'next-json': '#a0c4ff',
 }
 FALLBACK_COLORS = cast(tuple[ColorType, ...], cast(ListedColormap, plt.cm.Pastel1).colors)  # for serializers not listed in SERIALIZER_COLORS
@@ -156,8 +159,8 @@ def render_bars(
     ax.set_xticks(x)
     ax.set_xticklabels(scenario_labels, rotation=20, ha='right')
     ax.set_ylabel(ylabel)
-    ax.set_title(title, pad=40)
-    ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=len(serializers), frameon=False)
+    ax.set_title(title, pad=44)
+    ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1.0), ncol=ceil(len(serializers) / 2), frameon=False)
     fig.tight_layout()
 
     file_path = DATA_DIR / file_name

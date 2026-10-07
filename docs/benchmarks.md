@@ -10,6 +10,8 @@ We consider the following libraries:
     - Both `deduplicate: false` and `deduplicate: true` (marked as v1 and v2 respectively).
 - [`superjson`](https://github.com/ravionhq/superjson)
     - Both `dedupe: false` and `dedupe: true` (marked as v1 and v2 respectively).
+- [`danson`](https://github.com/KATT/danson)
+    - Both `dedupe: false` and `dedupe: true` (marked as v1 and v2 respectively).
 - [`devalue`](https://github.com/sveltejs/devalue)
 - [`serialize-JavaScript`](https://github.com/yahoo/serialize-javascript)
 - [`next-json`](https://github.com/iccicci/next-json)
@@ -46,10 +48,11 @@ Benchmark inputs are deterministic through the seed and reference date in `bench
 
 | library              | version |
 | -------------------- | ------- |
-| bun                  | 1.4.0   |
-| node                 | 26.8.2  |
+| bun                  | 1.4.2   |
+| node                 | 26.10.0 |
 | powerjson            | 1.2.2   |
 | superjson            | 2.2.6   |
+| danson               | 0.13.1  |
 | devalue              | 5.9.1   |
 | next-json            | 0.5.1   |
 | serialize-javascript | 7.1.0   |
@@ -77,5 +80,7 @@ Both `serialize-javascript` and `next-json` use a custom grammar to extend the J
 Both `powerjson` and `superjson` are generally OK in terms of size, except for scenarios with a lot of references without deduplication. Specifically, `v1` of both libraries explode in the *Circular References* scenario (which is a very specific case, not commonly encountered in real-world applications). Nevertheless, `v2` fixes this issue. In the end, `powerjson` produces almost everywhere smaller output than `superjson`.
 
 When it comes to speed, `powerjson`, again, outperforms `superjson` in almost every scenario, usually several times over. A much closer match is `powerjson` vs `devalue`, where the latter has an edge in parsing on Node, but `powerjson` is generally faster in other cases.
+
+`danson` produces human-readable, valid JSON. Its root object (`{ "json": ..., "refs": ... }`) is similar to `superjson`, however, it stores type annotations directly in the objects, which is similar to `powerjson`. It's generally good in terms of size, and slower than `powerjson` but faster than `superjson` in most cases. Its unique advantage is that it can transform async objects (e.g., promises) into a stream of JSON strings.
 
 Another takeaway is that Bun is in most scenarios faster than Node, and in some of them, it's not even close.
